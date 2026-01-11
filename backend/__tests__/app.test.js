@@ -1,0 +1,80 @@
+const request = require('supertest');
+const app = require('../src/app');
+
+describe('App Integration Tests', () => {
+  describe('Health Check', () => {
+    it('should return health status', async () => {
+      const response = await request(app)
+        .get('/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: 'ok' });
+    });
+  });
+
+  describe('CORS', () => {
+    it('should have CORS enabled', async () => {
+      const response = await request(app)
+        .get('/health')
+        .set('Origin', 'http://localhost:3000');
+
+      expect(response.headers['access-control-allow-origin']).toBe('*');
+    });
+  });
+
+  describe('JSON Parsing', () => {
+    it('should parse JSON requests', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'test@example.com', password: 'password' });
+
+      // Should not return 400 for malformed JSON (since we're sending valid JSON)
+      expect(response.status).not.toBe(400);
+    });
+  });
+
+  describe('Route Mounting', () => {
+    it('should mount auth routes', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({});
+
+      // Should reach the controller (not 404)
+      expect(response.status).not.toBe(404);
+    });
+
+    it('should mount db routes', async () => {
+      const response = await request(app)
+        .get('/api/db/types');
+
+      // Should reach the controller (not 404)
+      expect(response.status).not.toBe(404);
+    });
+
+    it('should mount request routes', async () => {
+      const response = await request(app)
+        .post('/api/request')
+        .send({});
+
+      // Should reach the controller (not 404)
+      expect(response.status).not.toBe(404);
+    });
+
+    it('should mount approval routes', async () => {
+      const response = await request(app)
+        .get('/api/approvals');
+
+      // Should reach the controller (not 404)
+      expect(response.status).not.toBe(404);
+    });
+  });
+
+  describe('404 Handling', () => {
+    it('should return 404 for unknown routes', async () => {
+      const response = await request(app)
+        .get('/api/unknown');
+
+      expect(response.status).toBe(404);
+    });
+  });
+});
