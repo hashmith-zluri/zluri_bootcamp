@@ -177,56 +177,6 @@ describe('PostgresDb Config', () => {
     });
   });
 
-  describe('validateQuery', () => {
-    it('should pass valid SELECT query', () => {
-      expect(() => postgresDbConfig.validateQuery('SELECT * FROM users;')).not.toThrow();
-    });
-
-    it('should pass valid INSERT query', () => {
-      expect(() => postgresDbConfig.validateQuery('INSERT INTO users (name) VALUES (\'test\');')).not.toThrow();
-    });
-
-    it('should pass valid UPDATE with WHERE', () => {
-      expect(() => postgresDbConfig.validateQuery('UPDATE users SET name = \'test\' WHERE id = 1;')).not.toThrow();
-    });
-
-    it('should pass valid DELETE with WHERE', () => {
-      expect(() => postgresDbConfig.validateQuery('DELETE FROM users WHERE id = 1;')).not.toThrow();
-    });
-
-    it('should reject query without semicolon', () => {
-      expect(() => postgresDbConfig.validateQuery('SELECT * FROM users')).toThrow('must end with a semicolon');
-    });
-
-    it('should reject DROP TABLE', () => {
-      expect(() => postgresDbConfig.validateQuery('DROP TABLE users;')).toThrow('dangerous operation');
-    });
-
-    it('should reject DROP DATABASE', () => {
-      expect(() => postgresDbConfig.validateQuery('DROP DATABASE mydb;')).toThrow('dangerous operation');
-    });
-
-    it('should reject TRUNCATE', () => {
-      expect(() => postgresDbConfig.validateQuery('TRUNCATE users;')).toThrow('dangerous operation');
-    });
-
-    it('should reject CREATE USER', () => {
-      expect(() => postgresDbConfig.validateQuery('CREATE USER admin;')).toThrow('dangerous operation');
-    });
-
-    it('should reject GRANT', () => {
-      expect(() => postgresDbConfig.validateQuery('GRANT ALL ON users TO admin;')).toThrow('dangerous operation');
-    });
-
-    it('should reject REVOKE', () => {
-      expect(() => postgresDbConfig.validateQuery('REVOKE ALL ON users FROM admin;')).toThrow('dangerous operation');
-    });
-
-    it('should reject ALTER USER', () => {
-      expect(() => postgresDbConfig.validateQuery('ALTER USER admin PASSWORD \'new\';')).toThrow('dangerous operation');
-    });
-  });
-
   describe('getPoolStats', () => {
     it('should return pool statistics object', () => {
       const stats = postgresDbConfig.getPoolStats();

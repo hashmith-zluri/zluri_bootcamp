@@ -1,6 +1,6 @@
 const postgresService = require('../src/services/postgres.service');
 const { query } = require('../src/config/db');
-const { executeTargetQuery, validateQuery } = require('../src/config/postgresDb');
+const { executeTargetQuery } = require('../src/config/postgresDb');
 
 jest.mock('../src/config/db');
 jest.mock('../src/config/postgresDb');
@@ -83,7 +83,6 @@ describe('PostgreSQL Service', () => {
         })
         .mockResolvedValue({ rows: [{ id: 1 }] }); // For status updates and logging
 
-      validateQuery.mockReturnValue(true);
       executeTargetQuery.mockResolvedValue({
         success: true,
         rows: [{ id: 1, name: 'Test' }],
@@ -95,29 +94,6 @@ describe('PostgreSQL Service', () => {
 
       expect(result.success).toBe(true);
       expect(result.rowCount).toBe(1);
-    });
-
-    it('should handle validation errors', async () => {
-      query.mockResolvedValue({
-        rows: [{
-          id: 1,
-          status: 'APPROVED',
-          engine: 'POSTGRES',
-          query_text: 'DROP TABLE users;',
-          instance_name: 'test-postgres',
-          database_name: 'test_db',
-          db_instance_id: 1
-        }]
-      });
-
-      validateQuery.mockImplementation(() => {
-        throw new Error('dangerous operation');
-      });
-
-      const result = await postgresService.executePostgresQuery(1);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('dangerous operation');
     });
 
     it('should handle execution failure', async () => {
@@ -135,7 +111,6 @@ describe('PostgreSQL Service', () => {
         })
         .mockResolvedValue({ rows: [{ id: 1 }] });
 
-      validateQuery.mockReturnValue(true);
       executeTargetQuery.mockResolvedValue({
         success: false,
         error: 'relation "nonexistent" does not exist',
@@ -301,7 +276,6 @@ describe('PostgreSQL Service', () => {
         })
         .mockResolvedValue({ rows: [{ id: 1 }] });
 
-      validateQuery.mockReturnValue(true);
       executeTargetQuery.mockResolvedValue({
         success: true,
         rows: [{ result: 1 }],

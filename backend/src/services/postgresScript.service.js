@@ -139,7 +139,6 @@ class PostgresScriptExecutionService {
   }
 
   async executeSQLScript(instance, databaseName, scriptContent, startTime) {
-    // SQL scripts are no longer supported - only JavaScript files
     return {
       success: false,
       error: 'SQL scripts are not supported. Please use JavaScript (.js) files only.',
@@ -347,7 +346,6 @@ class PostgresScriptExecutionService {
             
             // Clean up temp file safely
             fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ err => {
-              // Only log if it's not a "file not found" error
               if (err.code !== 'ENOENT') {
                 console.error('Failed to cleanup temp worker file:', err);
               }

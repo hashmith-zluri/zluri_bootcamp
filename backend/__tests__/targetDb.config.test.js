@@ -14,7 +14,6 @@ describe('TargetDb Config', () => {
     it('should export PostgreSQL functions', () => {
       expect(targetDb.createTargetDbConnection).toBeDefined();
       expect(targetDb.executeTargetQuery).toBeDefined();
-      expect(targetDb.validateQuery).toBeDefined();
     });
 
     it('should export MongoDB functions', () => {

@@ -84,3 +84,48 @@ router.get(
 );
 
 module.exports = router;
+
+/**
+ * @swagger
+ * /request:
+ *   post:
+ *     summary: Submit query or script request
+ *     tags:
+ *       - Requests
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - instance_id
+ *               - db_name
+ *               - comments
+ *               - pod_id
+ *             properties:
+ *               instance_id:
+ *                 type: integer
+ *                 example: 1
+ *               db_name:
+ *                 type: string
+ *               query:
+ *                 type: string
+ *                 example: SELECT * FROM users;
+ *               script:
+ *                 type: string
+ *                 format: binary
+ *               comments:
+ *                 type: string
+ *               pod_id:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Request submitted
+ */
+router.post(
+  "/",
+  authMiddleware,
+  upload.single("script"),
+  requestController.submitRequest
+);

@@ -1,4 +1,4 @@
-const { executeTargetQuery, validateQuery } = require('../config/postgresDb');
+const { executeTargetQuery } = require('../config/postgresDb');
 const { query } = require('../config/db');
 
 class PostgresExecutionService {
@@ -42,9 +42,6 @@ class PostgresExecutionService {
 
       // Update status to EXECUTING
       await this.updateRequestStatus(requestId, 'EXECUTING');
-
-      // Validate query for safety
-      validateQuery(request.query_text);
 
       // Execute the query on target database
       executionResult = await executeTargetQuery(

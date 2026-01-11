@@ -103,36 +103,6 @@ const executeTargetQuery = async (instanceId, databaseName, queryText) => {
   }
 };
 
-// Validate query for safety (basic checks)
-const validateQuery = (queryText) => {
-  const query = queryText.trim().toLowerCase();
-  
-  // Block dangerous operations
-  const dangerousPatterns = [
-    /drop\s+table/i,
-    /drop\s+database/i,
-    /truncate/i,
-    /delete\s+from.*where\s*$/i, // DELETE without WHERE clause
-    /update.*set.*where\s*$/i,   // UPDATE without WHERE clause
-    /create\s+user/i,
-    /grant/i,
-    /revoke/i,
-    /alter\s+user/i
-  ];
-  
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(query)) {
-      throw new Error(`Query contains potentially dangerous operation: ${pattern.source}`);
-    }
-  }
-  
-  if (!query.endsWith(';')) {
-    throw new Error('Query must end with a semicolon');
-  }
-  
-  return true;
-};
-
 // Gracefully close all PostgreSQL connection pools
 const closeAllPools = async () => {
   console.log(`Closing ${connectionPools.size} PostgreSQL pools...`);
@@ -168,7 +138,6 @@ const getPoolStats = () => {
 module.exports = {
   createTargetDbConnection,
   executeTargetQuery,
-  validateQuery,
   closeAllPools,
   getPoolStats
 };

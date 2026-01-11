@@ -4,8 +4,7 @@ const mongoDb = require('./mongoDb');
 // Re-export PostgreSQL functions
 const {
   createTargetDbConnection,
-  executeTargetQuery,
-  validateQuery
+  executeTargetQuery
 } = postgresDb;
 
 // Re-export MongoDB functions
@@ -42,7 +41,6 @@ module.exports = {
   // PostgreSQL exports
   createTargetDbConnection,
   executeTargetQuery,
-  validateQuery,
   
   // MongoDB exports
   createMongoConnection,
