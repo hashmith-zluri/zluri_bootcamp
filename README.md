@@ -11,7 +11,7 @@
     3. Security Implementation
         - Passwords stored using bcrypt with 10 rounds of salting
         - JWT verification checks both signature validity and active token status
-        - Token error handling: TOKEN_EXPIRED, TOKEN_NOT_ACTIVE, TOKEN_INVALID, TOKEN_VERIFICATION_FAILED
+        - Token error handling: TOKEN_EXPIRED, TOKEN_NOT_ACTIVE, TOKEN_INVALID,
         - Authorization header format: "Bearer <token>"
     4. Role-Based Access
         - Roles: USER, MANAGER, ADMIN
@@ -72,14 +72,13 @@
     3. Get Execution Result
         - GET /api/requests/:req_id/result
         - Returns execution output, error, execution time, executed_at
-        - Access: request owner, MANAGER, or ADMIN
+        - Access: request owner, MANAGER
 
 5. Query Execution (After Approval)
     1. Connection Pooling
         - PostgreSQL: Uses pg Pool with max 5 connections per instance+database
         - MongoDB: Uses MongoClient with maxPoolSize of 5
         - Connection idle timeout: 5 minutes (300000ms)
-        - Connection timeout: 10 seconds
         - Pools are cached and reused for subsequent queries
         - One pool per instance+database combination
     2. Query Timeout
@@ -95,7 +94,6 @@
         - Execution completes → status: EXECUTED or FAILED
         - Results logged to execution_logs table
     5. Result Handling
-        - Large result sets (>100 rows/documents) are truncated
         - Output includes row/document count and execution time
         - Errors captured with error message and code
     6. Script Execution

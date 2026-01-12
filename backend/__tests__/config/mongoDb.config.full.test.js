@@ -49,11 +49,11 @@ describe('MongoDB Config - Full Coverage', () => {
 
     // Mock db config
     mockQuery = jest.fn();
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: mockQuery
     }));
 
-    mongoDbConfig = require('../src/config/mongoDb');
+    mongoDbConfig = require('../../src/config/mongoDb');
   });
 
   describe('createMongoConnection', () => {
@@ -684,7 +684,7 @@ describe('MongoDB Config - Full Coverage', () => {
         MongoClient: jest.fn(() => mockClientNoTopology)
       }));
 
-      jest.doMock('../src/config/db', () => ({
+      jest.doMock('../../src/config/db', () => ({
         query: jest.fn().mockResolvedValue({
           rows: [{
             id: 201,
@@ -697,7 +697,7 @@ describe('MongoDB Config - Full Coverage', () => {
         })
       }));
 
-      const mongoDbConfigNew = require('../src/config/mongoDb');
+      const mongoDbConfigNew = require('../../src/config/mongoDb');
       
       await mongoDbConfigNew.getMongoConnection(201);
       

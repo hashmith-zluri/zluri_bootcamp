@@ -1,16 +1,16 @@
-const executionService = require('../src/services/execution.service');
-const postgresExecutionService = require('../src/services/postgres.service');
-const mongoExecutionService = require('../src/services/mongoExecution.service');
-const postgresScriptService = require('../src/services/postgresScript.service');
-const mongoScriptService = require('../src/services/mongoScript.service');
-const { query } = require('../src/config/db');
+const executionService = require('../../src/services/execution.service');
+const postgresExecutionService = require('../../src/services/postgres.service');
+const mongoExecutionService = require('../../src/services/mongoExecution.service');
+const postgresScriptService = require('../../src/services/postgresScript.service');
+const mongoScriptService = require('../../src/services/mongoScript.service');
+const { query } = require('../../src/config/db');
 
 // Mock all dependencies
-jest.mock('../src/config/db');
-jest.mock('../src/services/postgres.service');
-jest.mock('../src/services/mongoExecution.service');
-jest.mock('../src/services/postgresScript.service');
-jest.mock('../src/services/mongoScript.service');
+jest.mock('../../src/config/db');
+jest.mock('../../src/services/postgres.service');
+jest.mock('../../src/services/mongoExecution.service');
+jest.mock('../../src/services/postgresScript.service');
+jest.mock('../../src/services/mongoScript.service');
 
 describe('Execution Service', () => {
   beforeEach(() => {

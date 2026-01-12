@@ -1,0 +1,325 @@
+1. script example given in the reference implementation and mine are different as shown below 
+
+my implementation:::
+async function yourFunction() {
+  try {
+    // Your database operations using query() function
+    const data = await query('SELECT * FROM table');
+    
+    const result = {
+      // Your result data
+    };
+    
+    // REQUIRED: Must end with this
+    console.log(result);
+  } catch (error) {
+    console.log({ error: error.message });
+  }
+}
+
+yourFunction();
+
+
+reference given::
+
+const { Client } = require('pg');
+const config = require(process.env.DB_CONFIG_FILE);
+const client = new Client(config);
+await client.connect();
+const res = await client.query('SELECT * FROM users');
+console.log(res.rows);
+
+what is the difference between them?
+
+answer:
+Uses a pre-configured query() function with connection pooling already handled
+Connection details abstracted away, script only focuses on business logic
+Script is sandboxed, only has access to query() helper function
+Built-in try/catch with standardized error output format
+Wraps results in a structured object, consistent output format for the system to parse
+Connection cleanup handled by the execution service automatically
+
+Summary: Your implementation is more secure and maintainable because it:
+- Hides database credentials from scripts
+- Manages connection pooling centrally
+- Enforces consistent error handling and output format
+- Prevents resource leaks
+
+-------------------------------------------------------------------------------------
+
+2.diff between worker threads and vm2? why choose worker threads?
+
+answer:
+
+Worker Threads:
+- Native Node.js module (no external dependencies)
+- Runs code in a separate thread with its own V8 instance
+- True parallel execution, doesn't block main event loop
+- Has its own memory space but can share data via SharedArrayBuffer
+- Can be terminated forcefully with worker.terminate()
+- Full access to Node.js APIs (require, fs, etc.) unless restricted
+
+VM2:
+- Third-party npm package for sandboxed code execution
+- Runs code in the same thread but in an isolated V8 context
+- Blocks the main thread during execution
+- Designed specifically for security/sandboxing untrusted code
+- Can restrict access to Node.js built-ins and globals
+- DEPRECATED: vm2 is no longer maintained due to security vulnerabilities
+
+Why Worker Threads is the better choice:
+
+1. Security through isolation
+   - Separate thread = separate memory space
+   - Script crash doesn't bring down main server
+   - Can enforce timeouts by terminating the worker
+
+2. Performance
+   - Non-blocking execution
+   - Main thread stays responsive for other requests
+   - True parallelism for CPU-intensive scripts
+
+3. Reliability
+   - Native Node.js module, actively maintained
+   - No third-party security vulnerabilities
+   - Stable API, won't be deprecated
+
+4. Resource control
+   - Can limit execution time with worker.terminate()
+   - Memory isolation prevents scripts from affecting server
+   - Clean cleanup when script completes or times out
+
+5. vm2 is deprecated
+   - Multiple sandbox escape vulnerabilities discovered
+   - No longer receiving security updates
+   - Not recommended for production use
+   -child_process use too much resources, over-head
+
+Summary: Worker threads provide better isolation, performance, and long-term reliability compared to vm2, which is deprecated and has known security issues.
+
+----------------------------------------------------------------------------------------------
+
+3. we are storing the script submission via string and not as a file why? will it effect anything?
+
+answer:
+
+Why store as string in database instead of file:
+
+1. Simplicity
+   - No file system management needed
+   - No need to track file paths, handle file permissions, or manage directories
+   - Single source of truth - everything in the database
+
+2. Portability
+   - Database can be backed up/restored as a single unit
+   - No orphaned files if database records are deleted
+   - Easier to migrate between servers (no file sync needed)
+
+3. Atomicity
+   - Script content and metadata stored together in one transaction
+   - No risk of file existing without DB record or vice versa
+   - Rollbacks are clean - no leftover files
+
+4. Security
+   - No files on disk that could be accessed directly
+   - No file path traversal vulnerabilities
+   - Access controlled entirely through application layer
+
+5. Scalability
+   - Works well with database replication
+   - No shared file system needed for multiple app instances
+   - Cloud-friendly (no persistent disk storage required)
+
+Potential downsides (minimal impact):
+
+1. Database size
+   - Scripts stored as TEXT increase DB size
+   - With 16MB limit per script, this is manageable
+   - Most scripts are small (few KB)
+
+2. Memory usage
+   - Script loaded into memory when retrieved
+   - Not an issue for reasonable script sizes
+
+3. No direct file editing
+   - Can't edit scripts directly on server
+   - But this is actually a security benefit
+
+Does it affect anything?
+
+- Execution: No impact - script is written to temp file before worker execution anyway
+- Performance: Negligible - database TEXT retrieval is fast
+- Functionality: No difference from user perspective
+
+Summary: Storing as string is the better approach for this use case. It simplifies architecture, improves security, and has no meaningful performance impact given the script size limits.
+
+
+================================================================================
+POTENTIAL QUESTIONS BASED ON IMPLEMENTATION
+================================================================================
+
+4. Why use connection pooling instead of creating a new connection for each query?
+
+answer:
+- Performance: Creating connections is expensive (TCP handshake, authentication)
+- Resource efficiency: Limits max connections to database (prevents overload)
+- Reusability: Idle connections can be reused for new requests
+- Your implementation: Max 5 connections per pool, 5 min idle timeout, 10 sec connection timeout
+
+
+5. How do you prevent SQL injection in this system?
+
+answer:
+- Parameterized queries used in portal database operations
+- User scripts are isolated - they can't modify the portal database
+- Scripts execute against target databases with their own credentials
+- Manager approval required before any query/script execution
+- Note: Dangerous operations (DROP, TRUNCATE, etc.) are NOT blocked - manager is responsible for reviewing queries before approval
+
+
+6. Why store active JWT tokens in memory (Set) instead of database?
+
+answer:
+- Faster lookup: O(1) vs database query
+- Simpler logout: Just remove from Set
+- Trade-off: Tokens lost on server restart (users need to re-login)
+- For production: Consider Redis for distributed token storage
+
+
+7. What happens if a script runs forever or takes too long?
+
+answer:
+- Worker threads have timeout mechanism
+- Worker can be terminated with worker.terminate()
+- PostgreSQL has 30 second statement_timeout
+- MongoDB has 30 second socketTimeoutMS
+- Request status updated to FAILED on timeout
+
+
+8. Why use multer with memoryStorage instead of diskStorage?
+
+answer:
+- Security: No files written to disk that could be accessed
+- Simplicity: No cleanup needed, no temp file management
+- Performance: For small files, memory is faster
+- Script content goes directly to database as string
+
+
+9. How does the pod-based approval system work?
+
+answer:
+- Each pod has a manager_email in config
+- When user submits request, they select a pod
+- Only the manager of that pod sees the request in their approval queue
+- Manager email matched against JWT token's email claim
+
+
+10. Why execute queries asynchronously after approval?
+
+answer:
+- Non-blocking: API returns immediately after approval
+- User experience: Manager doesn't wait for query execution
+- Scalability: Server can handle more approval requests
+- Status tracking: User can poll for execution result
+
+
+11. What's the difference between query execution and script execution?
+
+answer:
+- Query: Single SQL/MongoDB statement, executed directly
+- Script: JavaScript file with multiple operations, runs in worker thread
+- Query: Direct execution via pg/mongodb driver
+- Script: Wrapped with helper functions, executed in isolated environment
+- Both: No dangerous operation blocking - manager approval is the security gate
+
+
+12. How do you handle large query results?
+
+answer:
+- Results truncated at 100 rows/documents
+- Summary shows total count
+- First 100 results displayed with "... and X more" message
+- Prevents memory issues and response size problems
+
+
+13. Why validate MongoDB collection names with regex?
+
+answer:
+- Prevents injection via collection name
+- Only allows: letters, numbers, underscores
+- Blocks special characters that could cause issues
+- Pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/
+
+
+14. Are dangerous operations blocked for PostgreSQL?
+
+answer:
+- NO - dangerous operations are NOT blocked at execution time
+- Manager approval is the security gate
+- Manager must review queries before approving
+- All operations (DROP, TRUNCATE, DELETE, etc.) will execute if approved
+- This design trusts the manager to make informed decisions
+
+
+15. How would you scale this system for high traffic?
+
+answer:
+- Move JWT tokens to Redis (distributed session)
+- Use message queue (RabbitMQ/SQS) for script execution
+- Horizontal scaling with load balancer
+- Database read replicas for query results
+- Connection pool per instance already supports multiple requests
+
+
+16. Why separate services for PostgreSQL and MongoDB execution?
+
+answer:
+- Different query syntax and validation rules
+- Different driver APIs (pg vs mongodb)
+- Different output formatting (rows vs documents)
+- Easier to maintain and extend
+- Single entry point via execution.service.js routes to correct service
+
+
+17. What security measures are in place for script execution?
+
+answer:
+- Worker thread isolation (separate memory space)
+- Timeout enforcement (can terminate worker)
+- No direct database credential access in scripts
+- File type restriction (.js only)
+- File size limit (16MB)
+- Script stored in DB, not filesystem
+- Manager approval required before execution (primary security gate)
+
+
+18. Why use Bearer token authentication instead of sessions?
+
+answer:
+- Stateless: Server doesn't need to store session data
+- Scalable: Works across multiple server instances
+- Mobile-friendly: Easy to use in API clients
+- Self-contained: Token has user info (id, email, role)
+
+
+19. How do you ensure only the request owner can see their results?
+
+answer:
+- JWT token contains userId
+- getMyRequests filters by requester_id = userId
+- getExecutionResult checks: owner OR MANAGER/ADMIN role
+- Middleware extracts user from token before controller
+
+
+20. What happens if the database connection fails during execution?
+
+answer:
+- Error caught in try/catch
+- Request status updated to FAILED
+- Error message logged to execution_logs table
+- Connection released back to pool (if acquired)
+- User sees error in execution result
+
+“We execute JavaScript scripts inside isolated worker threads with 
+restricted globals, execution timeouts, and controlled database access. 
+This provides a sandboxed runtime environment at the Node.js level.”

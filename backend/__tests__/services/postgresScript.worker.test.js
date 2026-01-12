@@ -9,7 +9,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
     
     // Mock db config
     mockQuery = jest.fn();
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: mockQuery
     }));
 
@@ -48,7 +48,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -101,7 +101,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -162,7 +162,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -216,7 +216,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -269,7 +269,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -341,7 +341,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       // Spy on console.error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -409,7 +409,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       // Spy on console.error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -477,7 +477,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       // Spy on console.error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -550,7 +550,7 @@ describe('PostgreSQL Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      postgresScriptService = require('../src/services/postgresScript.service');
+      postgresScriptService = require('../../src/services/postgresScript.service');
       
       // Spy on console.error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

@@ -7,7 +7,7 @@ class MongoExecutionService {
     
     try {
       const requestResult = await query(
-        `SELECT qr.*, di.name as instance_name, di.host, di.port, di.database, di.engine
+        `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine
          FROM query_requests qr 
          JOIN db_instances di ON qr.db_instance_id = di.id 
          WHERE qr.id = $1`,

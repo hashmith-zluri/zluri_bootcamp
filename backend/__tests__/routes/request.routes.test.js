@@ -1,11 +1,11 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
 
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 
 // Mock auth middleware
-jest.mock('../src/middlewares/auth.middleware', () => {
+jest.mock('../../src/middlewares/auth.middleware', () => {
   return (req, res, next) => {
     req.user = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
     next();

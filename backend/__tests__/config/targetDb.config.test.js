@@ -1,9 +1,9 @@
-const targetDb = require('../src/config/targetDb');
-const postgresDb = require('../src/config/postgresDb');
-const mongoDb = require('../src/config/mongoDb');
+const targetDb = require('../../src/config/targetDb');
+const postgresDb = require('../../src/config/postgresDb');
+const mongoDb = require('../../src/config/mongoDb');
 
-jest.mock('../src/config/postgresDb');
-jest.mock('../src/config/mongoDb');
+jest.mock('../../src/config/postgresDb');
+jest.mock('../../src/config/mongoDb');
 
 describe('TargetDb Config', () => {
   beforeEach(() => {

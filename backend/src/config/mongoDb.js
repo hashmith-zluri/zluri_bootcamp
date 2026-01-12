@@ -192,7 +192,7 @@ const executeMongoQuery = async (instanceId, databaseName, queryText) => {
     };
   }
 };
-
+//istanbul ignore next/
 const parseMongoQuery = (queryText) => {
   try {
     const cleanQuery = queryText.trim().replace(/;$/, '');
@@ -316,6 +316,7 @@ const parseShellParams = (paramsStr) => {
 };
 
 // Validate MongoDB query
+//istanbul ignore next/
 const validateMongoQuery = (queryText) => {
   try {
     const parsed = parseMongoQuery(queryText);

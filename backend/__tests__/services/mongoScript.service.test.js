@@ -1,7 +1,7 @@
-const mongoScriptService = require('../src/services/mongoScript.service');
-const { query } = require('../src/config/db');
+const mongoScriptService = require('../../src/services/mongoScript.service');
+const { query } = require('../../src/config/db');
 
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 
 // Mock fs.promises
 jest.mock('fs', () => ({
@@ -357,7 +357,7 @@ describe('MongoDB Script Service', () => {
         throw new Error('Worker threads not available');
       });
 
-      const mongoScript = require('../src/services/mongoScript.service');
+      const mongoScript = require('../../src/services/mongoScript.service');
       
       const instance = {
         host: 'localhost',

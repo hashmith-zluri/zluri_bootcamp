@@ -16,7 +16,7 @@ const getApprovalRequests = async (req, res) => {
     .map(pod => pod.id);
 
   if (managedPods.length === 0) {
-    return res.status(200).json({ requests: [] });
+    return res.status(200).json({ success: true, requests: [] });
   }
 
   try {
@@ -76,7 +76,7 @@ const getApprovalRequests = async (req, res) => {
         : null
     }));
 
-    return res.status(200).json({ requests });
+    return res.status(200).json({ success: true, requests });
 
   } catch (error) {
     console.error("Approval list fetch failed:", error);
@@ -156,7 +156,7 @@ const approveOrReject = async (req, res) => {
             });
         }
 
-        return res.status(200).json({ status: "approval" });
+        return res.status(200).json({ success: true, status: "approved" });
       }
   
       if (action === "reject") {
@@ -172,6 +172,7 @@ const approveOrReject = async (req, res) => {
         );
   
         return res.status(200).json({
+          success: true,
           status: "reject",
           reason: reason || null
         });
@@ -217,7 +218,7 @@ const getExecutionResult = async (req, res) => {
 
     // Get execution result
     const result = await executionService.getExecutionResult(req_id);
-    return res.status(200).json(result);
+    return res.status(200).json({ success: true, ...result });
 
   } catch (error) {
     console.error(`Failed to get execution result for request ${req_id}:`, error);

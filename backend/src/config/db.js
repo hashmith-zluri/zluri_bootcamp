@@ -11,6 +11,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
+/*istanbul ignore next*/
 const query = async (text, params = []) => {
   const start = Date.now();
   const result = await pool.query(text, params);

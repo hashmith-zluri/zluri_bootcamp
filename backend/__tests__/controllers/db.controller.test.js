@@ -1,12 +1,12 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
 
 // Mock the database
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 
 // Mock auth middleware
-jest.mock('../src/middlewares/auth.middleware', () => {
+jest.mock('../../src/middlewares/auth.middleware', () => {
   return (req, res, next) => {
     req.user = global.mockUser;
     next();
@@ -25,6 +25,7 @@ describe('DB Controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         types: ['POSTGRES', 'MONGO']
       });
     });
@@ -43,6 +44,7 @@ describe('DB Controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         instances: [
           { id: '1', name: 'postgres-prod' },
           { id: '2', name: 'postgres-dev' }
@@ -103,6 +105,7 @@ describe('DB Controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         databases: ['app_db', 'analytics_db']
       });
     });
@@ -129,6 +132,7 @@ describe('DB Controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         databases: ['user_db', 'product_db']
       });
     });

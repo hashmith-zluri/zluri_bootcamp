@@ -9,7 +9,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
     
     // Mock db config
     mockQuery = jest.fn();
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: mockQuery
     }));
 
@@ -48,7 +48,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      mongoScriptService = require('../src/services/mongoScript.service');
+      mongoScriptService = require('../../src/services/mongoScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -91,7 +91,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      mongoScriptService = require('../src/services/mongoScript.service');
+      mongoScriptService = require('../../src/services/mongoScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -142,7 +142,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      mongoScriptService = require('../src/services/mongoScript.service');
+      mongoScriptService = require('../../src/services/mongoScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -186,7 +186,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      mongoScriptService = require('../src/services/mongoScript.service');
+      mongoScriptService = require('../../src/services/mongoScript.service');
       
       mockQuery
         .mockResolvedValueOnce({
@@ -229,7 +229,7 @@ describe('MongoDB Script Service - Worker Thread Scenarios', () => {
         workerData: null
       }));
 
-      mongoScriptService = require('../src/services/mongoScript.service');
+      mongoScriptService = require('../../src/services/mongoScript.service');
       
       mockQuery
         .mockResolvedValueOnce({

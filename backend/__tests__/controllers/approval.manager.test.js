@@ -1,18 +1,18 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
-const executionService = require('../src/services/execution.service');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
+const executionService = require('../../src/services/execution.service');
 
 // Mock dependencies
-jest.mock('../src/config/db');
-jest.mock('../src/services/execution.service');
-jest.mock('../src/config/pods', () => [
+jest.mock('../../src/config/db');
+jest.mock('../../src/services/execution.service');
+jest.mock('../../src/config/pods', () => [
   { id: 1, manager_email: 'manager@example.com', name: 'Pod 1' },
   { id: 2, manager_email: 'other@example.com', name: 'Pod 2' }
 ]);
 
 // Mock auth middleware for manager
-jest.mock('../src/middlewares/auth.middleware', () => {
+jest.mock('../../src/middlewares/auth.middleware', () => {
   return (req, res, next) => {
     req.user = global.mockManager;
     next();
@@ -155,7 +155,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'approval' });
+      expect(response.body).toEqual({ success: true, status: 'approved' });
       expect(executionService.executeQuery).toHaveBeenCalledWith('1');
     });
 
@@ -171,7 +171,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'approval' });
+      expect(response.body).toEqual({ success: true, status: 'approved' });
       expect(executionService.executeQuery).toHaveBeenCalledWith('1');
     });
 
@@ -187,6 +187,7 @@ describe('Approval Controller - Manager Access', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         status: 'reject',
         reason: 'Security concerns'
       });
@@ -201,6 +202,7 @@ describe('Approval Controller - Manager Access', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
+        success: true,
         status: 'reject',
         reason: null
       });
@@ -258,7 +260,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'approval' });
+      expect(response.body).toEqual({ success: true, status: 'approved' });
       // The error is logged but doesn't affect the response
     });
 
@@ -274,7 +276,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'approval' });
+      expect(response.body).toEqual({ success: true, status: 'approved' });
     });
   });
 
@@ -296,7 +298,7 @@ describe('Approval Controller - Manager Access', () => {
         .get('/api/request/1/result');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockExecutionResult);
+      expect(response.body).toEqual({ success: true, ...mockExecutionResult });
     });
 
     it('should return 404 when request not found', async () => {

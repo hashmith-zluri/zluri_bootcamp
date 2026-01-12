@@ -1,9 +1,9 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const authService = require('../src/services/auth.service');
-const { query } = require('../src/config/db');
+const authService = require('../../src/services/auth.service');
+const { query } = require('../../src/config/db');
 
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
 

@@ -1,13 +1,13 @@
-const mongoExecutionService = require('../src/services/mongoExecution.service');
-const { query } = require('../src/config/db');
+const mongoExecutionService = require('../../src/services/mongoExecution.service');
+const { query } = require('../../src/config/db');
 
-jest.mock('../src/config/db');
-jest.mock('../src/config/mongoDb', () => ({
+jest.mock('../../src/config/db');
+jest.mock('../../src/config/mongoDb', () => ({
   executeMongoQuery: jest.fn(),
   validateMongoQuery: jest.fn()
 }));
 
-const { executeMongoQuery: mockExecuteMongoQuery, validateMongoQuery: mockValidateMongoQuery } = require('../src/config/mongoDb');
+const { executeMongoQuery: mockExecuteMongoQuery, validateMongoQuery: mockValidateMongoQuery } = require('../../src/config/mongoDb');
 
 describe('MongoDB Execution Service', () => {
   beforeEach(() => {

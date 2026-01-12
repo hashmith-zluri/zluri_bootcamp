@@ -28,11 +28,11 @@ describe('PostgresDb Config', () => {
 
     // Mock db config
     mockQuery = jest.fn();
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: mockQuery
     }));
 
-    postgresDbConfig = require('../src/config/postgresDb');
+    postgresDbConfig = require('../../src/config/postgresDb');
   });
 
   describe('createTargetDbConnection', () => {

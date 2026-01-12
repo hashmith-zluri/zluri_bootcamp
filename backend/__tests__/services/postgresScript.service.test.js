@@ -1,7 +1,7 @@
-const postgresScriptService = require('../src/services/postgresScript.service');
-const { query } = require('../src/config/db');
+const postgresScriptService = require('../../src/services/postgresScript.service');
+const { query } = require('../../src/config/db');
 
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 
 // Mock fs.promises
 jest.mock('fs', () => ({

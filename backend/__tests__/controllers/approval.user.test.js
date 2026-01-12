@@ -1,16 +1,16 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
 
 // Mock dependencies
-jest.mock('../src/config/db');
-jest.mock('../src/config/pods', () => [
+jest.mock('../../src/config/db');
+jest.mock('../../src/config/pods', () => [
   { id: 1, manager_email: 'manager@example.com', name: 'Pod 1' },
   { id: 2, manager_email: 'other@example.com', name: 'Pod 2' }
 ]);
 
 // Mock auth middleware for regular user
-jest.mock('../src/middlewares/auth.middleware', () => {
+jest.mock('../../src/middlewares/auth.middleware', () => {
   return (req, res, next) => {
     req.user = global.mockUser;
     next();

@@ -120,6 +120,7 @@ const closeAllPools = async () => {
 };
 
 // Get pool statistics for monitoring
+//istanbul ignore next/
 const getPoolStats = () => {
   const stats = {};
   

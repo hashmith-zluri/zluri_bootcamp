@@ -1,12 +1,12 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
-const executionService = require('../src/services/execution.service');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
+const executionService = require('../../src/services/execution.service');
 
 // Mock dependencies
-jest.mock('../src/config/db');
-jest.mock('../src/services/execution.service');
-jest.mock('../src/config/pods', () => [
+jest.mock('../../src/config/db');
+jest.mock('../../src/services/execution.service');
+jest.mock('../../src/config/pods', () => [
   { id: 1, manager_email: 'manager@example.com', name: 'Pod 1' },
   { id: 2, manager_email: 'other@example.com', name: 'Pod 2' }
 ]);
@@ -20,14 +20,14 @@ describe('Approval Controller', () => {
     it('should return 403 for non-manager users', async () => {
       // Mock auth middleware for non-manager
       jest.resetModules();
-      jest.doMock('../src/middlewares/auth.middleware', () => {
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
         return (req, res, next) => {
           req.user = { id: 1, email: 'user@example.com', role: 'DEVELOPER' };
           next();
         };
       });
 
-      const appWithUser = require('../src/app');
+      const appWithUser = require('../../src/app');
       
       const response = await request(appWithUser)
         .get('/api/approvals');
@@ -41,34 +41,34 @@ describe('Approval Controller', () => {
 
     it('should return empty array when manager has no pods', async () => {
       jest.resetModules();
-      jest.doMock('../src/middlewares/auth.middleware', () => {
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
         return (req, res, next) => {
           req.user = { id: 3, email: 'nopods@example.com', role: 'MANAGER' };
           next();
         };
       });
 
-      const appWithNoPods = require('../src/app');
+      const appWithNoPods = require('../../src/app');
       
       const response = await request(appWithNoPods)
         .get('/api/approvals');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ requests: [] });
+      expect(response.body).toEqual({ success: true, requests: [] });
     });
   });
 
   describe('POST /api/approvals/:req_id/action - Access Control', () => {
     it('should return 403 for non-manager users', async () => {
       jest.resetModules();
-      jest.doMock('../src/middlewares/auth.middleware', () => {
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
         return (req, res, next) => {
           req.user = { id: 1, email: 'user@example.com', role: 'DEVELOPER' };
           next();
         };
       });
 
-      const appWithUser = require('../src/app');
+      const appWithUser = require('../../src/app');
       
       const response = await request(appWithUser)
         .post('/api/approvals/1/action')
@@ -85,19 +85,19 @@ describe('Approval Controller', () => {
   describe('GET /api/request/:req_id/result - Access Control', () => {
     it('should return 403 when user does not own request and is not manager', async () => {
       jest.resetModules();
-      jest.doMock('../src/middlewares/auth.middleware', () => {
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
         return (req, res, next) => {
           req.user = { id: 99, email: 'other@example.com', role: 'DEVELOPER' };
           next();
         };
       });
-      jest.doMock('../src/config/db', () => ({
+      jest.doMock('../../src/config/db', () => ({
         query: jest.fn().mockResolvedValue({
           rows: [{ requester_id: 1 }] // Different user owns this request
         })
       }));
 
-      const appWithOtherUser = require('../src/app');
+      const appWithOtherUser = require('../../src/app');
       
       const response = await request(appWithOtherUser)
         .get('/api/request/1/result');
@@ -117,7 +117,7 @@ describe('Approval Controller - Manager Access', () => {
     jest.resetModules();
     
     // Reset mocks for manager access
-    jest.doMock('../src/middlewares/auth.middleware', () => {
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
       return (req, res, next) => {
         req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
         next();
@@ -127,7 +127,7 @@ describe('Approval Controller - Manager Access', () => {
 
   describe('GET /api/approvals', () => {
     it('should return approval requests for manager', async () => {
-      jest.doMock('../src/config/db', () => ({
+      jest.doMock('../../src/config/db', () => ({
         query: jest.fn().mockResolvedValue({
           rows: [{
             reqid: 1,
@@ -152,7 +152,7 @@ describe('Approval Controller - Manager Access', () => {
         })
       }));
 
-      const appWithManager = require('../src/app');
+      const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
         .get('/api/approvals');
@@ -167,7 +167,7 @@ describe('Approval Controller - Manager Access', () => {
     });
 
     it('should include execution results when available', async () => {
-      jest.doMock('../src/config/db', () => ({
+      jest.doMock('../../src/config/db', () => ({
         query: jest.fn().mockResolvedValue({
           rows: [{
             reqid: 1,
@@ -192,7 +192,7 @@ describe('Approval Controller - Manager Access', () => {
         })
       }));
 
-      const appWithManager = require('../src/app');
+      const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
         .get('/api/approvals');
@@ -214,7 +214,7 @@ describe('Approval Controller - Execution Triggering', () => {
     jest.resetModules();
     
     // Reset mocks for manager access
-    jest.doMock('../src/middlewares/auth.middleware', () => {
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
       return (req, res, next) => {
         req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
         next();
@@ -224,7 +224,7 @@ describe('Approval Controller - Execution Triggering', () => {
 
   describe('POST /api/approvals/:req_id/action - Approval without execution', () => {
     it('should not trigger execution for request without query or script', async () => {
-      jest.doMock('../src/config/db', () => ({
+      jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
           .mockResolvedValueOnce({ rows: [{ pod_id: 1 }] }) // Check request exists
           .mockResolvedValueOnce({ 
@@ -237,14 +237,14 @@ describe('Approval Controller - Execution Triggering', () => {
           }) // Update and return
       }));
 
-      const appWithManager = require('../src/app');
+      const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
         .post('/api/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body.status).toBe('approval');
+      expect(response.body.status).toBe('approved');
     }, 10000);
   });
 });

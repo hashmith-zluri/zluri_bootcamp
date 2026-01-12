@@ -1,12 +1,12 @@
 const request = require('supertest');
-const app = require('../src/app');
-const { query } = require('../src/config/db');
+const app = require('../../src/app');
+const { query } = require('../../src/config/db');
 
 // Mock the database
-jest.mock('../src/config/db');
+jest.mock('../../src/config/db');
 
 // Mock auth middleware
-jest.mock('../src/middlewares/auth.middleware', () => {
+jest.mock('../../src/middlewares/auth.middleware', () => {
   return (req, res, next) => {
     req.user = global.mockUser;
     next();
@@ -226,7 +226,7 @@ describe('Request Controller - No User', () => {
     jest.resetModules();
     
     // Mock auth middleware to not set user
-    jest.doMock('../src/middlewares/auth.middleware', () => {
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
       return (req, res, next) => {
         req.user = null; // No user
         next();
@@ -235,7 +235,7 @@ describe('Request Controller - No User', () => {
   });
 
   it('should return 401 when user is not set', async () => {
-    const appNoUser = require('../src/app');
+    const appNoUser = require('../../src/app');
     
     const response = await request(appNoUser)
       .get('/api/request/mine');
@@ -255,7 +255,7 @@ describe('Request Controller - Edge Cases', () => {
     jest.resetModules();
     
     // Mock auth middleware with user
-    jest.doMock('../src/middlewares/auth.middleware', () => {
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
       return (req, res, next) => {
         req.user = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
         next();
@@ -264,7 +264,7 @@ describe('Request Controller - Edge Cases', () => {
   });
 
   it('should return requests with failed execution results', async () => {
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: jest.fn().mockResolvedValue({
         rows: [
           {
@@ -288,7 +288,7 @@ describe('Request Controller - Edge Cases', () => {
       })
     }));
 
-    const appWithUser = require('../src/app');
+    const appWithUser = require('../../src/app');
     
     const response = await request(appWithUser)
       .get('/api/request/mine');
@@ -301,11 +301,11 @@ describe('Request Controller - Edge Cases', () => {
   });
 
   it('should handle submit request when req.body is undefined', async () => {
-    jest.doMock('../src/config/db', () => ({
+    jest.doMock('../../src/config/db', () => ({
       query: jest.fn()
     }));
 
-    const appWithUser = require('../src/app');
+    const appWithUser = require('../../src/app');
     
     const response = await request(appWithUser)
       .post('/api/request')

@@ -6,8 +6,8 @@ async function getAllUsers() {
     // Execute the users query
     const result = await query('SELECT * FROM users ORDER BY id');
     
-    console.log('=== USERS TABLE - COMPLETE DATA ===');
-    console.log('Total users found:', result.rows.length);
+    console.log("=== USERS TABLE - COMPLETE DATA ===");
+    console.log("Total users found:", result.rows.length);
     console.log('');
     
     if (result.rows.length > 0) {

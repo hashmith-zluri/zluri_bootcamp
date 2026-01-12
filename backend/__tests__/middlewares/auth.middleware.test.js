@@ -1,7 +1,7 @@
-const authMiddleware = require('../src/middlewares/auth.middleware');
-const authService = require('../src/services/auth.service');
+const authMiddleware = require('../../src/middlewares/auth.middleware');
+const authService = require('../../src/services/auth.service');
 
-jest.mock('../src/services/auth.service');
+jest.mock('../../src/services/auth.service');
 
 describe('Auth Middleware', () => {
   let mockReq, mockRes, mockNext;

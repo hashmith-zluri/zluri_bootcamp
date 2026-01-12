@@ -1,9 +1,9 @@
-const postgresService = require('../src/services/postgres.service');
-const { query } = require('../src/config/db');
-const { executeTargetQuery } = require('../src/config/postgresDb');
+const postgresService = require('../../src/services/postgres.service');
+const { query } = require('../../src/config/db');
+const { executeTargetQuery } = require('../../src/config/postgresDb');
 
-jest.mock('../src/config/db');
-jest.mock('../src/config/postgresDb');
+jest.mock('../../src/config/db');
+jest.mock('../../src/config/postgresDb');
 
 describe('PostgreSQL Service', () => {
   beforeEach(() => {

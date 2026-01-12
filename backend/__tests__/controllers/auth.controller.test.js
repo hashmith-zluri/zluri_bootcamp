@@ -1,13 +1,13 @@
 const request = require('supertest');
 
 // Mock auth service before requiring app
-jest.mock('../src/services/auth.service', () => ({
+jest.mock('../../src/services/auth.service', () => ({
   login: jest.fn(),
   logout: jest.fn(),
   verifyToken: jest.fn()
 }));
 
-const authService = require('../src/services/auth.service');
+const authService = require('../../src/services/auth.service');
 
 describe('Auth Controller', () => {
   let app;
@@ -18,18 +18,18 @@ describe('Auth Controller', () => {
     jest.resetModules();
     
     // Re-mock after reset
-    jest.doMock('../src/services/auth.service', () => ({
+    jest.doMock('../../src/services/auth.service', () => ({
       login: jest.fn(),
       logout: jest.fn(),
       verifyToken: jest.fn()
     }));
     
-    app = require('../src/app');
+    app = require('../../src/app');
   });
 
   describe('POST /api/auth/login', () => {
     it('should login successfully with valid credentials', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       authSvc.login.mockResolvedValue({
         token: 'mock-jwt-token',
         user: {
@@ -83,7 +83,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 401 for invalid credentials', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       authSvc.login.mockRejectedValue(new Error('Invalid email or password'));
 
       const response = await request(app)
@@ -101,7 +101,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 401 with default message when error has no message', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       const error = new Error();
       error.message = '';
       authSvc.login.mockRejectedValue(error);
@@ -121,7 +121,7 @@ describe('Auth Controller', () => {
 
   describe('POST /api/auth/logout', () => {
     it('should logout successfully with valid token', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       authSvc.verifyToken.mockReturnValue({
         userId: 1,
         email: 'test@example.com',
@@ -150,7 +150,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 500 when logout throws error', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       authSvc.verifyToken.mockReturnValue({
         userId: 1,
         email: 'test@example.com',
@@ -172,7 +172,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 500 with default message when error has no message', async () => {
-      const authSvc = require('../src/services/auth.service');
+      const authSvc = require('../../src/services/auth.service');
       authSvc.verifyToken.mockReturnValue({
         userId: 1,
         email: 'test@example.com',

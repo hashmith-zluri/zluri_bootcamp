@@ -152,7 +152,7 @@ const getMyRequests = async (req, res) => {
         : null
     }));
 
-    return res.status(200).json({ requests });
+    return res.status(200).json({ success: true, requests });
 
   } catch (error) {
     console.error("Fetch user requests failed:", error);
