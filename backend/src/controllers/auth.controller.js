@@ -26,7 +26,6 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
-    /* istanbul ignore else */
     if (token) {
       authService.logout(token);
     }

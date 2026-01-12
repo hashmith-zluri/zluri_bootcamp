@@ -137,10 +137,10 @@ const approveOrReject = async (req, res) => {
           
           // Execute query asynchronously (don't wait for completion)
           executionService.executeQuery(req_id)
-            .then(/* istanbul ignore next */ result => {
+            .then(result => /*istanbul ignore next*/{
               console.log(`Query execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
             })
-            .catch(/* istanbul ignore next */ error => {
+            .catch(error => /*istanbul ignore next*/{
               console.error(`Query execution error for request ${req_id}:`, error.message);
             });
         } else if (request.script_path) {
@@ -148,17 +148,16 @@ const approveOrReject = async (req, res) => {
           
           // Execute script asynchronously - executionService handles routing to correct engine
           executionService.executeQuery(req_id)
-            .then(/* istanbul ignore next */ result => {
+            .then(result => /*istanbul ignore next*/{
               console.log(`Script execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
             })
-            .catch(/* istanbul ignore next */ error => {
+            .catch(error => /*istanbul ignore next*/{
               console.error(`Script execution error for request ${req_id}:`, error.message);
             });
         }
 
         return res.status(200).json({ success: true, status: "approved" });
       }
-      //istanbul ignore next/
       if (action === "reject") {
         await query(
           `

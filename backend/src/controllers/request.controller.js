@@ -1,7 +1,6 @@
 const { query } = require("../config/db");
 
 const submitRequest = async (req, res) => {
-  //istanbul ignore next/
   const {
     instance_id,
     db_name,
@@ -10,7 +9,6 @@ const submitRequest = async (req, res) => {
     pod_id
   } = req.body || {};
 
-  /* istanbul ignore next */
   const userId = req.user?.id;
   const scriptFile = req.file; // Now contains buffer, not file path
 

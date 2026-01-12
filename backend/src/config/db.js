@@ -10,7 +10,6 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
-
 /*istanbul ignore next*/
 const query = async (text, params = []) => {
   const start = Date.now();

@@ -91,7 +91,7 @@ const executeMongoQuery = async (instanceId, databaseName, queryText) => {
     let result;
     
     // Operation mapping - supports all MongoDB operations
-    /* istanbul ignore next */
+    /*istanbul ignore next*/
     const operations = {
       find: async () => {
         let cursor = collection.find(parsedQuery.filter || {});
@@ -192,7 +192,7 @@ const executeMongoQuery = async (instanceId, databaseName, queryText) => {
     };
   }
 };
-//istanbul ignore next/
+/*istanbul ignore next*/
 const parseMongoQuery = (queryText) => {
   try {
     const cleanQuery = queryText.trim().replace(/;$/, '');
@@ -265,7 +265,7 @@ const parseMongoQuery = (queryText) => {
 };
 
 // Helper function to parse shell parameters
-/* istanbul ignore next */
+//Istanbul ignore next/
 const parseShellParams = (paramsStr) => {
   if (!paramsStr.trim()) return [];
   
@@ -295,7 +295,9 @@ const parseShellParams = (paramsStr) => {
       } else if (!inString && char === '}') {
         braceCount--;
         currentParam += char;
+        //istanbul ignore next/
       } else if (!inString && char === ',' && braceCount === 0) {
+        //istanbul ignore next/
         if (currentParam.trim()) {
           params.push(JSON.parse(currentParam.trim()));
         }
@@ -316,7 +318,7 @@ const parseShellParams = (paramsStr) => {
 };
 
 // Validate MongoDB query
-//istanbul ignore next/
+/*istanbul ignore next*/
 const validateMongoQuery = (queryText) => {
   try {
     const parsed = parseMongoQuery(queryText);

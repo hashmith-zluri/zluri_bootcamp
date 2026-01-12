@@ -152,7 +152,6 @@ class PostgresScriptExecutionService {
       const path = require('path');
       
       // Create worker script content
-      /* istanbul ignore next */
       const workerScript = `
         const { parentPort, workerData } = require('worker_threads');
         const { Client } = require('pg');
@@ -345,7 +344,7 @@ class PostgresScriptExecutionService {
             const executionTime = Date.now() - startTime;
             
             // Clean up temp file safely
-            fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ err => {
+            fs.unlink(tempWorkerFile).catch(err => {
               if (err.code !== 'ENOENT') {
                 console.error('Failed to cleanup temp worker file:', err);
               }
@@ -363,7 +362,7 @@ class PostgresScriptExecutionService {
             const executionTime = Date.now() - startTime;
             
             // Clean up temp file safely
-            fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ err => {
+            fs.unlink(tempWorkerFile).catch(err => {
               if (err.code !== 'ENOENT') {
                 console.error('Failed to cleanup temp worker file:', err);
               }
@@ -385,7 +384,7 @@ class PostgresScriptExecutionService {
               const executionTime = Date.now() - startTime;
               
               // Clean up temp file safely
-              fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ err => {
+              fs.unlink(tempWorkerFile).catch(err => {
                 if (err.code !== 'ENOENT') {
                   console.error('Failed to cleanup temp worker file:', err);
                 }

@@ -368,5 +368,119 @@ describe('PostgreSQL Script Service', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Database connection failed');
     });
+
+    it('should handle worker error event', async () => {
+      // Mock worker_threads to simulate worker error
+      jest.doMock('worker_threads', () => {
+        const EventEmitter = require('events');
+        
+        class MockWorkerWithError extends EventEmitter {
+          constructor(file, options) {
+            super();
+            this.workerData = options?.workerData;
+            
+            // Simulate worker error
+            setTimeout(() => {
+              this.emit('error', new Error('Worker thread crashed'));
+            }, 10);
+          }
+          
+          terminate() {
+            return Promise.resolve();
+          }
+        }
+        
+        return {
+          Worker: MockWorkerWithError,
+          isMainThread: true,
+          parentPort: null,
+          workerData: null
+        };
+      });
+
+      // Re-require to get new mock
+      jest.resetModules();
+      
+      // Re-mock the db query for the new module instance
+      const mockQuery = jest.fn();
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+      
+      const postgresScriptServiceNew = require('../../src/services/postgresScript.service');
+
+      mockQuery.mockResolvedValue({
+        rows: [{
+          id: 1,
+          host: 'localhost',
+          port: 5432,
+          username: 'test',
+          password: 'test'
+        }]
+      });
+
+      const result = await postgresScriptServiceNew.executeScript(1, 'test_db', 'console.log("test");');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Worker error');
+    }, 15000);
+
+    it('should handle worker exit with non-zero code', async () => {
+      // Mock worker_threads to simulate worker exit with error code
+      jest.doMock('worker_threads', () => {
+        const EventEmitter = require('events');
+        
+        class MockWorkerWithExit extends EventEmitter {
+          constructor(file, options) {
+            super();
+            this.workerData = options?.workerData;
+            
+            // Simulate worker exit with error code
+            setTimeout(() => {
+              this.emit('exit', 1); // Non-zero exit code
+            }, 10);
+          }
+          
+          terminate() {
+            return Promise.resolve();
+          }
+        }
+        
+        return {
+          Worker: MockWorkerWithExit,
+          isMainThread: true,
+          parentPort: null,
+          workerData: null
+        };
+      });
+
+      // Re-require to get new mock
+      jest.resetModules();
+      
+      // Re-mock the db query for the new module instance
+      const mockQuery = jest.fn();
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+      
+      const postgresScriptServiceNew = require('../../src/services/postgresScript.service');
+
+      mockQuery.mockResolvedValue({
+        rows: [{
+          id: 1,
+          host: 'localhost',
+          port: 5432,
+          username: 'test',
+          password: 'test'
+        }]
+      });
+
+      const result = await postgresScriptServiceNew.executeScript(1, 'test_db', 'console.log("test");');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Worker stopped with exit code 1');
+    }, 15000);
+
+
   });
 });

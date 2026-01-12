@@ -482,6 +482,15 @@ describe('MongoDB Config - Full Coverage', () => {
       expect(() => mongoDbConfig.parseMongoQuery('db.users.find({invalid json})')).toThrow();
     });
 
+    it('should throw error for invalid JSON in parameters', () => {
+      // This tests line 201 - the catch block in parseMongoQuery when JSON.parse fails
+      expect(() => mongoDbConfig.parseMongoQuery('db.users.find({"invalid": json})')).toThrow('Invalid parameters');
+    });
+
+    it('should throw error for invalid MongoDB shell format', () => {
+      expect(() => mongoDbConfig.parseMongoQuery('invalid query format')).toThrow('Invalid MongoDB shell format');
+    });
+
     it('should handle string with escaped quotes', () => {
       const result = mongoDbConfig.parseMongoQuery('db.users.find({"name": "test"})');
       

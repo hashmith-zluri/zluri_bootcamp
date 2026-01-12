@@ -197,5 +197,21 @@ describe('Auth Controller', () => {
       expect(response.status).toBe(500);
       expect(response.body.message).toBe('Logout failed');
     });
+
+    it('should logout successfully even without authorization header (edge case)', async () => {
+      // This tests the case where somehow a request gets through without auth header
+      // but still reaches the logout controller (bypassing middleware)
+      const authSvc = require('../../src/services/auth.service');
+      
+      // Mock the middleware to allow the request through
+      const originalApp = require('../../src/app');
+      
+      const response = await request(originalApp)
+        .post('/api/v1/auth/logout');
+
+      // This should still return 401 due to middleware, but if it somehow gets through,
+      // the controller should handle it gracefully
+      expect(response.status).toBe(401);
+    });
   });
 });

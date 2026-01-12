@@ -126,8 +126,7 @@ class MongoScriptExecutionService {
       };
     }
   }
-
-
+  
   /* istanbul ignore next */
   async executeJSScript(instance, databaseName, scriptContent, startTime) {
     return new Promise((resolve) => {
@@ -285,13 +284,13 @@ class MongoScriptExecutionService {
           
           worker.on('message', (result) => {
             clearTimeout(timeout);
-            fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ () => {});
+            fs.unlink(tempWorkerFile).catch(() => {});
             resolve({ ...result, executionTime: Date.now() - startTime });
           });
           
           worker.on('error', (error) => {
             clearTimeout(timeout);
-            fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ () => {});
+            fs.unlink(tempWorkerFile).catch(() => {});
             resolve({
               success: false,
               error: `Worker error: ${error.message}`,
@@ -303,7 +302,7 @@ class MongoScriptExecutionService {
           worker.on('exit', (code) => {
             clearTimeout(timeout);
             if (code !== 0) {
-              fs.unlink(tempWorkerFile).catch(/* istanbul ignore next */ () => {});
+              fs.unlink(tempWorkerFile).catch(() => {});
               resolve({
                 success: false,
                 error: `Worker stopped with exit code ${code}`,

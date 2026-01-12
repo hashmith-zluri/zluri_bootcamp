@@ -183,6 +183,72 @@ describe('PostgresDb Config', () => {
       expect(stats).toBeDefined();
       expect(typeof stats).toBe('object');
     });
+
+    it('should return pool statistics with actual pool data', async () => {
+      mockQuery.mockResolvedValue({
+        rows: [{
+          id: 999,
+          host: 'localhost',
+          port: 5432,
+          engine: 'POSTGRES'
+        }]
+      });
+
+      mockClient.query
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      // Create a pool by executing a query
+      await postgresDbConfig.executeTargetQuery(999, 'test_db', 'SELECT 1;');
+      
+      const stats = postgresDbConfig.getPoolStats();
+      
+      expect(stats).toBeDefined();
+      expect(stats['999_test_db']).toBeDefined();
+      expect(stats['999_test_db'].type).toBe('postgres');
+      expect(stats['999_test_db'].totalCount).toBe(5);
+      expect(stats['999_test_db'].idleCount).toBe(3);
+      expect(stats['999_test_db'].waitingCount).toBe(0);
+    });
+
+    it('should return pool statistics with waitingCount property', async () => {
+      // Test line 127 - waitingCount property access
+      mockQuery.mockResolvedValue({
+        rows: [{
+          id: 998,
+          host: 'localhost',
+          port: 5432,
+          engine: 'POSTGRES'
+        }]
+      });
+
+      // Mock pool with waitingCount > 0
+      const mockPoolWithWaiting = {
+        connect: jest.fn().mockResolvedValue(mockClient),
+        end: jest.fn().mockResolvedValue(undefined),
+        totalCount: 10,
+        idleCount: 2,
+        waitingCount: 3 // This tests line 127
+      };
+
+      jest.doMock('pg', () => ({
+        Pool: jest.fn(() => mockPoolWithWaiting)
+      }));
+
+      // Re-require to get new mock
+      jest.resetModules();
+      const postgresDbConfigNew = require('../../src/config/postgresDb');
+
+      mockClient.query
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await postgresDbConfigNew.executeTargetQuery(998, 'test_db', 'SELECT 1;');
+      
+      const stats = postgresDbConfigNew.getPoolStats();
+      
+      expect(stats['998_test_db'].waitingCount).toBe(3);
+    });
   });
 
   describe('closeAllPools', () => {

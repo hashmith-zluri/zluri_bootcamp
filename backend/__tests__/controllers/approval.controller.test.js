@@ -246,5 +246,48 @@ describe('Approval Controller - Execution Triggering', () => {
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('approved');
     }, 10000);
+
+    it('should reject request successfully', async () => {
+      jest.doMock('../../src/config/db', () => ({
+        query: jest.fn()
+          .mockResolvedValueOnce({ rows: [{ pod_id: 1 }] }) // Check request exists
+          .mockResolvedValueOnce({ rows: [] }) // Update query
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Security concerns'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'reject',
+        reason: 'Security concerns'
+      });
+    }, 10000);
+
+    it('should handle invalid action', async () => {
+      jest.doMock('../../src/config/db', () => ({
+        query: jest.fn()
+          .mockResolvedValueOnce({ rows: [{ pod_id: 1 }] }) // Check request exists
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'invalid' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Invalid action'
+      });
+    }, 10000);
   });
 });
