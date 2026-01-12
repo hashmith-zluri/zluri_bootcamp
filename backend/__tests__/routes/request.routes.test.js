@@ -17,10 +17,10 @@ describe('Request Routes - File Upload', () => {
     jest.clearAllMocks();
   });
 
-  describe('POST /api/request - File upload errors', () => {
+  describe('POST /api/v1/request - File upload errors', () => {
     it('should reject non-JS files', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test')
@@ -36,7 +36,7 @@ describe('Request Routes - File Upload', () => {
       const largeBuffer = Buffer.alloc(17 * 1024 * 1024, 'x');
       
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test')
@@ -53,7 +53,7 @@ describe('Request Routes - File Upload', () => {
       });
 
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test script')
@@ -70,7 +70,7 @@ describe('Request Routes - File Upload', () => {
       });
 
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send({
           instance_id: 1,
           db_name: 'test_db',
@@ -85,7 +85,7 @@ describe('Request Routes - File Upload', () => {
 
     it('should handle multer unexpected field error', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test')
@@ -100,7 +100,7 @@ describe('Request Routes - File Upload', () => {
       // This tests the multer error handling for too many files
       // Since multer is configured for single file, sending multiple triggers this
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test')

@@ -18,10 +18,10 @@ describe('DB Controller', () => {
     jest.clearAllMocks();
   });
 
-  describe('GET /api/db/types', () => {
+  describe('GET /api/v1/db/types', () => {
     it('should return database types', async () => {
       const response = await request(app)
-        .get('/api/db/types');
+        .get('/api/v1/db/types');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -31,7 +31,7 @@ describe('DB Controller', () => {
     });
   });
 
-  describe('GET /api/db/instances', () => {
+  describe('GET /api/v1/db/instances', () => {
     it('should return database instances for valid type', async () => {
       const mockInstances = [
         { id: 1, name: 'postgres-prod' },
@@ -40,7 +40,7 @@ describe('DB Controller', () => {
       query.mockResolvedValue({ rows: mockInstances });
 
       const response = await request(app)
-        .get('/api/db/instances?type=POSTGRES');
+        .get('/api/v1/db/instances?type=POSTGRES');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -58,7 +58,7 @@ describe('DB Controller', () => {
 
     it('should return 400 when type parameter is missing', async () => {
       const response = await request(app)
-        .get('/api/db/instances');
+        .get('/api/v1/db/instances');
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
@@ -72,7 +72,7 @@ describe('DB Controller', () => {
       query.mockRejectedValue(new Error('Database connection failed'));
 
       const response = await request(app)
-        .get('/api/db/instances?type=POSTGRES');
+        .get('/api/v1/db/instances?type=POSTGRES');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({
@@ -82,7 +82,7 @@ describe('DB Controller', () => {
     });
   });
 
-  describe('GET /api/db/instances/:id/name', () => {
+  describe('GET /api/v1/db/instances/:id/name', () => {
     it('should return databases for PostgreSQL instance', async () => {
       const mockInstance = {
         name: 'postgres-prod',
@@ -101,7 +101,7 @@ describe('DB Controller', () => {
         .mockResolvedValueOnce({ rows: mockDatabases });
 
       const response = await request(app)
-        .get('/api/db/instances/1/name');
+        .get('/api/v1/db/instances/1/name');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -128,7 +128,7 @@ describe('DB Controller', () => {
         .mockResolvedValueOnce({ rows: mockDatabases });
 
       const response = await request(app)
-        .get('/api/db/instances/1/name');
+        .get('/api/v1/db/instances/1/name');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -141,7 +141,7 @@ describe('DB Controller', () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .get('/api/db/instances/999/name');
+        .get('/api/v1/db/instances/999/name');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
@@ -158,7 +158,7 @@ describe('DB Controller', () => {
       query.mockResolvedValue({ rows: [mockInstance] });
 
       const response = await request(app)
-        .get('/api/db/instances/1/name');
+        .get('/api/v1/db/instances/1/name');
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
@@ -171,7 +171,7 @@ describe('DB Controller', () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
-        .get('/api/db/instances/1/name');
+        .get('/api/v1/db/instances/1/name');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({

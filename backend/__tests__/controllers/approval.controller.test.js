@@ -16,7 +16,7 @@ describe('Approval Controller', () => {
     jest.clearAllMocks();
   });
 
-  describe('GET /api/approvals - Access Control', () => {
+  describe('GET /api/v1/approvals - Access Control', () => {
     it('should return 403 for non-manager users', async () => {
       // Mock auth middleware for non-manager
       jest.resetModules();
@@ -30,7 +30,7 @@ describe('Approval Controller', () => {
       const appWithUser = require('../../src/app');
       
       const response = await request(appWithUser)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(403);
       expect(response.body).toEqual({
@@ -51,14 +51,14 @@ describe('Approval Controller', () => {
       const appWithNoPods = require('../../src/app');
       
       const response = await request(appWithNoPods)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ success: true, requests: [] });
     });
   });
 
-  describe('POST /api/approvals/:req_id/action - Access Control', () => {
+  describe('POST /api/v1/approvals/:req_id/action - Access Control', () => {
     it('should return 403 for non-manager users', async () => {
       jest.resetModules();
       jest.doMock('../../src/middlewares/auth.middleware', () => {
@@ -71,7 +71,7 @@ describe('Approval Controller', () => {
       const appWithUser = require('../../src/app');
       
       const response = await request(appWithUser)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(403);
@@ -82,7 +82,7 @@ describe('Approval Controller', () => {
     });
   });
 
-  describe('GET /api/request/:req_id/result - Access Control', () => {
+  describe('GET /api/v1/request/:req_id/result - Access Control', () => {
     it('should return 403 when user does not own request and is not manager', async () => {
       jest.resetModules();
       jest.doMock('../../src/middlewares/auth.middleware', () => {
@@ -100,7 +100,7 @@ describe('Approval Controller', () => {
       const appWithOtherUser = require('../../src/app');
       
       const response = await request(appWithOtherUser)
-        .get('/api/request/1/result');
+        .get('/api/v1/request/1/result');
 
       expect(response.status).toBe(403);
       expect(response.body).toEqual({
@@ -125,7 +125,7 @@ describe('Approval Controller - Manager Access', () => {
     });
   });
 
-  describe('GET /api/approvals', () => {
+  describe('GET /api/v1/approvals', () => {
     it('should return approval requests for manager', async () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn().mockResolvedValue({
@@ -155,7 +155,7 @@ describe('Approval Controller - Manager Access', () => {
       const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body.requests).toHaveLength(1);
@@ -195,7 +195,7 @@ describe('Approval Controller - Manager Access', () => {
       const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body.requests[0].result).toMatchObject({
@@ -222,7 +222,7 @@ describe('Approval Controller - Execution Triggering', () => {
     });
   });
 
-  describe('POST /api/approvals/:req_id/action - Approval without execution', () => {
+  describe('POST /api/v1/approvals/:req_id/action - Approval without execution', () => {
     it('should not trigger execution for request without query or script', async () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
@@ -240,7 +240,7 @@ describe('Approval Controller - Execution Triggering', () => {
       const appWithManager = require('../../src/app');
       
       const response = await request(appWithManager)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);

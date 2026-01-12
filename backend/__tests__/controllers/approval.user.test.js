@@ -22,10 +22,10 @@ describe('Approval Controller - User Access', () => {
     jest.clearAllMocks();
   });
 
-  describe('GET /api/approvals', () => {
+  describe('GET /api/v1/approvals', () => {
     it('should return 403 for non-manager users', async () => {
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(403);
       expect(response.body).toEqual({
@@ -35,10 +35,10 @@ describe('Approval Controller - User Access', () => {
     });
   });
 
-  describe('POST /api/approvals/:reqId/action', () => {
+  describe('POST /api/v1/approvals/:reqId/action', () => {
     it('should return 403 for non-manager users', async () => {
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(403);
@@ -49,7 +49,7 @@ describe('Approval Controller - User Access', () => {
     });
   });
 
-  describe('GET /api/request/:reqid/result', () => {
+  describe('GET /api/v1/request/:reqid/result', () => {
     it('should return execution result for own request', async () => {
       const mockRequestResult = {
         rows: [{ requester_id: 1 }] // User's own request
@@ -58,7 +58,7 @@ describe('Approval Controller - User Access', () => {
       query.mockResolvedValue(mockRequestResult);
 
       const response = await request(app)
-        .get('/api/request/1/result');
+        .get('/api/v1/request/1/result');
 
       expect(response.status).toBe(200);
     });
@@ -70,7 +70,7 @@ describe('Approval Controller - User Access', () => {
       query.mockResolvedValue(mockRequestResult);
 
       const response = await request(app)
-        .get('/api/request/1/result');
+        .get('/api/v1/request/1/result');
 
       expect(response.status).toBe(403);
       expect(response.body).toEqual({

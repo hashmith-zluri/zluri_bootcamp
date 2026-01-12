@@ -27,7 +27,7 @@ describe('Auth Controller', () => {
     app = require('../../src/app');
   });
 
-  describe('POST /api/auth/login', () => {
+  describe('POST /api/v1/auth/login', () => {
     it('should login successfully with valid credentials', async () => {
       const authSvc = require('../../src/services/auth.service');
       authSvc.login.mockResolvedValue({
@@ -41,7 +41,7 @@ describe('Auth Controller', () => {
       });
 
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({
           email: 'test@example.com',
           password: 'password123'
@@ -56,7 +56,7 @@ describe('Auth Controller', () => {
 
     it('should return 400 when email is missing', async () => {
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({
           password: 'password123'
         });
@@ -70,7 +70,7 @@ describe('Auth Controller', () => {
 
     it('should return 400 when password is missing', async () => {
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({
           email: 'test@example.com'
         });
@@ -87,7 +87,7 @@ describe('Auth Controller', () => {
       authSvc.login.mockRejectedValue(new Error('Invalid email or password'));
 
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({
           email: 'test@example.com',
           password: 'wrongpassword'
@@ -107,7 +107,7 @@ describe('Auth Controller', () => {
       authSvc.login.mockRejectedValue(error);
 
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({
           email: 'test@example.com',
           password: 'password'
@@ -119,7 +119,7 @@ describe('Auth Controller', () => {
     });
   });
 
-  describe('POST /api/auth/logout', () => {
+  describe('POST /api/v1/auth/logout', () => {
     it('should logout successfully with valid token', async () => {
       const authSvc = require('../../src/services/auth.service');
       authSvc.verifyToken.mockReturnValue({
@@ -130,7 +130,7 @@ describe('Auth Controller', () => {
       authSvc.logout.mockReturnValue(true);
 
       const response = await request(app)
-        .post('/api/auth/logout')
+        .post('/api/v1/auth/logout')
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(200);
@@ -143,7 +143,7 @@ describe('Auth Controller', () => {
 
     it('should return 401 without token', async () => {
       const response = await request(app)
-        .post('/api/auth/logout');
+        .post('/api/v1/auth/logout');
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('No token provided');
@@ -161,7 +161,7 @@ describe('Auth Controller', () => {
       });
 
       const response = await request(app)
-        .post('/api/auth/logout')
+        .post('/api/v1/auth/logout')
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(500);
@@ -185,7 +185,7 @@ describe('Auth Controller', () => {
       });
 
       const response = await request(app)
-        .post('/api/auth/logout')
+        .post('/api/v1/auth/logout')
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(500);

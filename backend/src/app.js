@@ -14,20 +14,22 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+const API_VERSION = "/api/v1";
+
 // Authentication routes
 const authRoutes = require("./routes/auth.routes");
-app.use("/api/auth", authRoutes);
+app.use(`${API_VERSION}/auth`, authRoutes);
 
 // DB routes
 const dbRoutes = require("./routes/db.routes");
-app.use("/api/db", dbRoutes);
+app.use(`${API_VERSION}/db`, dbRoutes);
 
 // Request routes
 const requestRoutes = require("./routes/request.routes");
-app.use("/api/request", requestRoutes);
+app.use(`${API_VERSION}/request`, requestRoutes);
 
 // Approval routes
 const approvalroutes = require("./routes/approval.routes")
-app.use("/api/approvals", approvalroutes);
+app.use(`${API_VERSION}/approvals`, approvalroutes);
 
 module.exports = app;

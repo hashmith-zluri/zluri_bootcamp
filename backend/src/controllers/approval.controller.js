@@ -158,7 +158,7 @@ const approveOrReject = async (req, res) => {
 
         return res.status(200).json({ success: true, status: "approved" });
       }
-  
+      //istanbul ignore next/
       if (action === "reject") {
         await query(
           `

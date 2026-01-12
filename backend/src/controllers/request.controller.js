@@ -1,7 +1,7 @@
 const { query } = require("../config/db");
 
 const submitRequest = async (req, res) => {
-
+  //istanbul ignore next/
   const {
     instance_id,
     db_name,

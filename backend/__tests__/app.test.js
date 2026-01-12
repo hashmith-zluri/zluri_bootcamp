@@ -25,7 +25,7 @@ describe('App Integration Tests', () => {
   describe('JSON Parsing', () => {
     it('should parse JSON requests', async () => {
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'test@example.com', password: 'password' });
 
       // Should not return 400 for malformed JSON (since we're sending valid JSON)
@@ -36,7 +36,7 @@ describe('App Integration Tests', () => {
   describe('Route Mounting', () => {
     it('should mount auth routes', async () => {
       const response = await request(app)
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({});
 
       // Should reach the controller (not 404)
@@ -45,7 +45,7 @@ describe('App Integration Tests', () => {
 
     it('should mount db routes', async () => {
       const response = await request(app)
-        .get('/api/db/types');
+        .get('/api/v1/db/types');
 
       // Should reach the controller (not 404)
       expect(response.status).not.toBe(404);
@@ -53,7 +53,7 @@ describe('App Integration Tests', () => {
 
     it('should mount request routes', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send({});
 
       // Should reach the controller (not 404)
@@ -62,7 +62,7 @@ describe('App Integration Tests', () => {
 
     it('should mount approval routes', async () => {
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       // Should reach the controller (not 404)
       expect(response.status).not.toBe(404);
@@ -72,7 +72,7 @@ describe('App Integration Tests', () => {
   describe('404 Handling', () => {
     it('should return 404 for unknown routes', async () => {
       const response = await request(app)
-        .get('/api/unknown');
+        .get('/api/v1/unknown');
 
       expect(response.status).toBe(404);
     });

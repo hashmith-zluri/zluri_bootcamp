@@ -18,7 +18,7 @@ describe('Request Controller', () => {
     jest.clearAllMocks();
   });
 
-  describe('POST /api/request', () => {
+  describe('POST /api/v1/request', () => {
     const validRequestData = {
       instance_id: 1,
       db_name: 'test_db',
@@ -34,7 +34,7 @@ describe('Request Controller', () => {
       query.mockResolvedValue(mockResult);
 
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send(validRequestData);
 
       expect(response.status).toBe(201);
@@ -53,7 +53,7 @@ describe('Request Controller', () => {
 
       const scriptContent = 'console.log("test script");';
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('comments', 'Test script')
@@ -70,7 +70,7 @@ describe('Request Controller', () => {
 
     it('should return 400 when required fields are missing', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send({
           instance_id: 1,
           db_name: 'test_db'
@@ -87,7 +87,7 @@ describe('Request Controller', () => {
 
     it('should return 400 when neither query nor script provided', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send({
           instance_id: 1,
           db_name: 'test_db',
@@ -104,7 +104,7 @@ describe('Request Controller', () => {
 
     it('should return 400 when both query and script provided', async () => {
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .field('instance_id', '1')
         .field('db_name', 'test_db')
         .field('query', 'SELECT * FROM users')
@@ -123,7 +123,7 @@ describe('Request Controller', () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
-        .post('/api/request')
+        .post('/api/v1/request')
         .send(validRequestData);
 
       expect(response.status).toBe(500);
@@ -134,7 +134,7 @@ describe('Request Controller', () => {
     });
   });
 
-  describe('GET /api/request/mine', () => {
+  describe('GET /api/v1/request/mine', () => {
     it('should return user requests successfully', async () => {
       const mockRequests = [
         {
@@ -158,7 +158,7 @@ describe('Request Controller', () => {
       query.mockResolvedValue({ rows: mockRequests });
 
       const response = await request(app)
-        .get('/api/request/mine');
+        .get('/api/v1/request/mine');
 
       expect(response.status).toBe(200);
       expect(response.body.requests).toHaveLength(1);
@@ -194,7 +194,7 @@ describe('Request Controller', () => {
       query.mockResolvedValue({ rows: mockRequests });
 
       const response = await request(app)
-        .get('/api/request/mine');
+        .get('/api/v1/request/mine');
 
       expect(response.status).toBe(200);
       expect(response.body.requests[0].result).toMatchObject({
@@ -209,7 +209,7 @@ describe('Request Controller', () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
-        .get('/api/request/mine');
+        .get('/api/v1/request/mine');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({
@@ -238,7 +238,7 @@ describe('Request Controller - No User', () => {
     const appNoUser = require('../../src/app');
     
     const response = await request(appNoUser)
-      .get('/api/request/mine');
+      .get('/api/v1/request/mine');
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
@@ -291,7 +291,7 @@ describe('Request Controller - Edge Cases', () => {
     const appWithUser = require('../../src/app');
     
     const response = await request(appWithUser)
-      .get('/api/request/mine');
+      .get('/api/v1/request/mine');
 
     expect(response.status).toBe(200);
     expect(response.body.requests[0].result).toMatchObject({
@@ -308,7 +308,7 @@ describe('Request Controller - Edge Cases', () => {
     const appWithUser = require('../../src/app');
     
     const response = await request(appWithUser)
-      .post('/api/request')
+      .post('/api/v1/request')
       .set('Content-Type', 'application/json')
       .send(undefined);
 

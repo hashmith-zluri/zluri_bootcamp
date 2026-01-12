@@ -6,11 +6,34 @@ const mongoScriptService = require('../../src/services/mongoScript.service');
 const { query } = require('../../src/config/db');
 
 // Mock all dependencies
-jest.mock('../../src/config/db');
-jest.mock('../../src/services/postgres.service');
-jest.mock('../../src/services/mongoExecution.service');
-jest.mock('../../src/services/postgresScript.service');
-jest.mock('../../src/services/mongoScript.service');
+jest.mock('../../src/config/db', () => ({
+  query: jest.fn()
+}));
+
+jest.mock('../../src/services/postgres.service', () => ({
+  executePostgresQuery: jest.fn(),
+  getExecutionResult: jest.fn(),
+  executeMultipleQueries: jest.fn(),
+  updateRequestStatus: jest.fn(),
+  logExecution: jest.fn()
+}));
+
+jest.mock('../../src/services/mongoExecution.service', () => ({
+  executeMongoQuery: jest.fn(),
+  getExecutionResult: jest.fn(),
+  executeMultipleQueries: jest.fn()
+}));
+
+jest.mock('../../src/services/postgresScript.service', () => ({
+  executePostgresScript: jest.fn(),
+  getScriptExecutionResult: jest.fn()
+}));
+
+jest.mock('../../src/services/mongoScript.service', () => ({
+  executeMongoScript: jest.fn(),
+  getScriptExecutionResult: jest.fn()
+}));
+
 
 describe('Execution Service', () => {
   beforeEach(() => {

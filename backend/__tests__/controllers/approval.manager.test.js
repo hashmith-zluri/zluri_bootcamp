@@ -24,7 +24,7 @@ describe('Approval Controller - Manager Access', () => {
     jest.clearAllMocks();
   });
 
-  describe('GET /api/approvals', () => {
+  describe('GET /api/v1/approvals', () => {
     it('should return approval requests for manager', async () => {
       const mockRequests = [
         {
@@ -51,7 +51,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: mockRequests });
 
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body.requests).toHaveLength(1);
@@ -89,7 +89,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: mockRequests });
 
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body.requests[0].result.status).toBe('success');
@@ -121,7 +121,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: mockRequests });
 
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
       expect(response.body.requests[0].result.status).toBe('failure');
@@ -132,7 +132,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
-        .get('/api/approvals');
+        .get('/api/v1/approvals');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({
@@ -142,7 +142,7 @@ describe('Approval Controller - Manager Access', () => {
     });
   });
 
-  describe('POST /api/approvals/:reqId/action', () => {
+  describe('POST /api/v1/approvals/:reqId/action', () => {
     it('should approve request successfully', async () => {
       const mockUpdateResult = {
         rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }]
@@ -151,7 +151,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.executeQuery.mockResolvedValue({ success: true });
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
@@ -167,7 +167,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.executeQuery.mockResolvedValue({ success: true });
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
@@ -179,7 +179,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ 
           action: 'reject',
           reason: 'Security concerns'
@@ -197,7 +197,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'reject' });
 
       expect(response.status).toBe(200);
@@ -210,7 +210,7 @@ describe('Approval Controller - Manager Access', () => {
 
     it('should return 400 for invalid action', async () => {
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'invalid' });
 
       expect(response.status).toBe(400);
@@ -224,7 +224,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(404);
@@ -238,7 +238,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(500);
@@ -256,7 +256,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.executeQuery.mockRejectedValue(new Error('Execution failed'));
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
@@ -272,7 +272,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.executeQuery.mockRejectedValue(new Error('Script execution failed'));
 
       const response = await request(app)
-        .post('/api/approvals/1/action')
+        .post('/api/v1/approvals/1/action')
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
@@ -280,7 +280,7 @@ describe('Approval Controller - Manager Access', () => {
     });
   });
 
-  describe('GET /api/request/:req_id/result', () => {
+  describe('GET /api/v1/request/:req_id/result', () => {
     it('should return execution result for request owner', async () => {
       const mockRequestResult = {
         rows: [{ requester_id: 2 }] // Manager's ID
@@ -295,7 +295,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.getExecutionResult.mockResolvedValue(mockExecutionResult);
 
       const response = await request(app)
-        .get('/api/request/1/result');
+        .get('/api/v1/request/1/result');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ success: true, ...mockExecutionResult });
@@ -305,7 +305,7 @@ describe('Approval Controller - Manager Access', () => {
       query.mockResolvedValue({ rows: [] });
 
       const response = await request(app)
-        .get('/api/request/999/result');
+        .get('/api/v1/request/999/result');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
@@ -322,7 +322,7 @@ describe('Approval Controller - Manager Access', () => {
       executionService.getExecutionResult.mockRejectedValue(new Error('Execution error'));
 
       const response = await request(app)
-        .get('/api/request/1/result');
+        .get('/api/v1/request/1/result');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({
