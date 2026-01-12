@@ -49,8 +49,14 @@ describe('Auth Controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
-        jwtToken: 'mock-jwt-token',
-        success: true
+        success: true,
+        token: 'mock-jwt-token',
+        user: {
+          id: 1,
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'DEVELOPER'
+        }
       });
     });
 

@@ -11,8 +11,9 @@ const login = async (req, res) => {
     }
     const result = await authService.login(email, password);
     res.status(200).json({
-      jwtToken: result.token,
       success: true,
+      token: result.token,
+      user: result.user,
     });
   } catch (error) {
     res.status(401).json({

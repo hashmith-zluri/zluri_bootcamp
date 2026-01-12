@@ -56,7 +56,7 @@ const getMongoConnection = async (instanceId) => {
     const client = await createMongoConnection({
       host: instance.host,
       port: instance.port,
-      database: instance.database,
+      database: null, // Database will be specified per query
       username: instance.username,
       password: instance.password
     });
