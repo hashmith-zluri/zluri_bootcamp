@@ -159,20 +159,46 @@ const approveOrReject = async (req, res) => {
         return res.status(200).json({ success: true, status: "approved" });
       }
       if (action === "reject") {
-        await query(
+        // Update request status to REJECTED and store rejection reason
+        const rejectionComment = reason ? `\n[REJECTED] ${reason}` : '\n[REJECTED] No reason provided';
+        
+        const updateResult = await query(
           `
           UPDATE query_requests
           SET status = 'REJECTED',
               approved_by = $1,
-              approved_at = NOW()
+              approved_at = NOW(),
+              comments = COALESCE(comments, '') || $3
           WHERE id = $2 AND status = 'PENDING'
+          RETURNING id
           `,
-          [approverId, req_id]
+          [approverId, req_id, rejectionComment]
+        );
+
+        if (updateResult.rows.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "Request not found or already processed"
+          });
+        }
+
+        // Log the rejection for audit purposes
+        await query(
+          `INSERT INTO execution_logs 
+           (request_id, success, output, error, execution_time_ms) 
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            req_id,
+            false,
+            null,
+            `Request rejected by manager. Reason: ${reason || 'No reason provided'}`,
+            0
+          ]
         );
   
         return res.status(200).json({
           success: true,
-          status: "reject",
+          status: "rejected",
           reason: reason || null
         });
       }

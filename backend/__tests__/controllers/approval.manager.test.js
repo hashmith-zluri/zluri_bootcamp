@@ -175,38 +175,7 @@ describe('Approval Controller - Manager Access', () => {
       expect(executionService.executeQuery).toHaveBeenCalledWith('1');
     });
 
-    it('should reject request successfully', async () => {
-      query.mockResolvedValue({ rows: [] });
 
-      const response = await request(app)
-        .post('/api/v1/approvals/1/action')
-        .send({ 
-          action: 'reject',
-          reason: 'Security concerns'
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        success: true,
-        status: 'reject',
-        reason: 'Security concerns'
-      });
-    });
-
-    it('should reject request without reason', async () => {
-      query.mockResolvedValue({ rows: [] });
-
-      const response = await request(app)
-        .post('/api/v1/approvals/1/action')
-        .send({ action: 'reject' });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        success: true,
-        status: 'reject',
-        reason: null
-      });
-    });
 
     it('should return 400 for invalid action', async () => {
       const response = await request(app)

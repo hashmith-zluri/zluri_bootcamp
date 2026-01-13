@@ -251,7 +251,8 @@ describe('Approval Controller - Execution Triggering', () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
           .mockResolvedValueOnce({ rows: [{ pod_id: 1 }] }) // Check request exists
-          .mockResolvedValueOnce({ rows: [] }) // Update query
+          .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update query
+          .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Insert execution log
       }));
 
       const appWithManager = require('../../src/app');
@@ -266,7 +267,7 @@ describe('Approval Controller - Execution Triggering', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         success: true,
-        status: 'reject',
+        status: 'rejected',
         reason: 'Security concerns'
       });
     }, 10000);
