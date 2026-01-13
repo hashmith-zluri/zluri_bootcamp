@@ -7,8 +7,8 @@ const executionService = require('../../src/services/execution.service');
 jest.mock('../../src/config/db');
 jest.mock('../../src/services/execution.service');
 jest.mock('../../src/config/pods', () => [
-  { id: 1, manager_email: 'manager@example.com', name: 'Pod 1' },
-  { id: 2, manager_email: 'other@example.com', name: 'Pod 2' }
+  { id: 'pod-1', manager_email: 'manager@example.com', name: 'Pod 1' },
+  { id: 'pod-2', manager_email: 'other@example.com', name: 'Pod 2' }
 ]);
 
 // Mock auth middleware for manager
@@ -144,10 +144,11 @@ describe('Approval Controller - Manager Access', () => {
 
   describe('POST /api/v1/approvals/:reqId/action', () => {
     it('should approve request successfully', async () => {
-      const mockUpdateResult = {
-        rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }]
-      };
-      query.mockResolvedValue(mockUpdateResult);
+      // First call: POD check query
+      // Second call: Update query
+      query
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check - manager owns POD 1
+        .mockResolvedValueOnce({ rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }] }); // Update
       executionService.executeQuery.mockResolvedValue({ success: true });
 
       const response = await request(app)
@@ -160,10 +161,9 @@ describe('Approval Controller - Manager Access', () => {
     });
 
     it('should approve script request and trigger script execution', async () => {
-      const mockUpdateResult = {
-        rows: [{ id: 1, query_text: null, script_path: 'test script content' }]
-      };
-      query.mockResolvedValue(mockUpdateResult);
+      query
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ id: 1, query_text: null, script_path: 'test script content' }] }); // Update
       executionService.executeQuery.mockResolvedValue({ success: true });
 
       const response = await request(app)
@@ -175,7 +175,20 @@ describe('Approval Controller - Manager Access', () => {
       expect(executionService.executeQuery).toHaveBeenCalledWith('1');
     });
 
+    it('should return 403 when manager tries to approve request from different POD', async () => {
+      // Request belongs to POD 2, but manager only manages POD 1
+      query.mockResolvedValueOnce({ rows: [{ pod_id: 'pod-2' }] });
 
+      const response = await request(app)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Access denied - request belongs to different POD'
+      });
+    });
 
     it('should return 400 for invalid action', async () => {
       const response = await request(app)
@@ -218,10 +231,9 @@ describe('Approval Controller - Manager Access', () => {
     });
 
     it('should handle query execution error in async callback', async () => {
-      const mockUpdateResult = {
-        rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }]
-      };
-      query.mockResolvedValue(mockUpdateResult);
+      query
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }] }); // Update
       executionService.executeQuery.mockRejectedValue(new Error('Execution failed'));
 
       const response = await request(app)
@@ -234,10 +246,9 @@ describe('Approval Controller - Manager Access', () => {
     });
 
     it('should handle script execution error in async callback', async () => {
-      const mockUpdateResult = {
-        rows: [{ id: 1, query_text: null, script_path: 'console.log("test")' }]
-      };
-      query.mockResolvedValue(mockUpdateResult);
+      query
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ id: 1, query_text: null, script_path: 'console.log("test")' }] }); // Update
       executionService.executeQuery.mockRejectedValue(new Error('Script execution failed'));
 
       const response = await request(app)

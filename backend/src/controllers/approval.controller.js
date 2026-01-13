@@ -91,12 +91,25 @@ const approveOrReject = async (req, res) => {
     const { req_id } = req.params;
     const { action, reason } = req.body;
     const approverId = req.user?.id;
+    const managerEmail = req.user?.email;
     const role = req.user?.role;
   
     if (role !== "MANAGER") {
       return res.status(403).json({
         success: false,
         message: "Access denied"
+      });
+    }
+
+    // Get manager's managed PODs
+    const managedPods = pods
+      .filter(pod => pod.manager_email === managerEmail)
+      .map(pod => pod.id);
+
+    if (managedPods.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied - no PODs assigned"
       });
     }
   
@@ -108,6 +121,27 @@ const approveOrReject = async (req, res) => {
     }
   
     try {
+      // Verify manager owns the POD for this request
+      const requestCheck = await query(
+        'SELECT pod_id FROM query_requests WHERE id = $1 AND status = \'PENDING\'',
+        [req_id]
+      );
+
+      if (requestCheck.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Request not found or already processed"
+        });
+      }
+
+      const requestPodId = requestCheck.rows[0].pod_id;
+      if (!managedPods.includes(requestPodId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied - request belongs to different POD"
+        });
+      }
+
       if (action === "approve") {
         // Update request status to APPROVED
         const updateResult = await query(
