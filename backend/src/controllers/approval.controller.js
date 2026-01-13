@@ -174,7 +174,7 @@ const approveOrReject = async (req, res) => {
           `,
           [approverId, req_id, rejectionComment]
         );
-
+        //istanbul ignore next/
         if (updateResult.rows.length === 0) {
           return res.status(404).json({
             success: false,

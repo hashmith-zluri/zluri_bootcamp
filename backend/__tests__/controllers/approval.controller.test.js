@@ -292,3 +292,305 @@ describe('Approval Controller - Execution Triggering', () => {
     }, 10000);
   });
 });
+
+describe('Approval Controller - Rejection Workflow', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+    
+    // Reset mocks for manager access
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
+      return (req, res, next) => {
+        req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+        next();
+      };
+    });
+  });
+
+  describe('POST /api/v1/approvals/:req_id/action - Rejection Tests', () => {
+    it('should reject request with reason and store in comments', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Query needs modification before approval'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'rejected',
+        reason: 'Query needs modification before approval'
+      });
+
+      // Verify the rejection update query was called correctly
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE query_requests'),
+        [2, '1', '\n[REJECTED] Query needs modification before approval']
+      );
+
+      // Verify audit log was created
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO execution_logs'),
+        [
+          '1',
+          false,
+          null,
+          'Request rejected by manager. Reason: Query needs modification before approval',
+          0
+        ]
+      );
+    });
+
+    it('should reject request without reason and use default message', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'reject' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'rejected',
+        reason: null
+      });
+
+      // Verify the rejection update query was called with default message
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE query_requests'),
+        [2, '1', '\n[REJECTED] No reason provided']
+      );
+
+      // Verify audit log was created with default message
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO execution_logs'),
+        [
+          '1',
+          false,
+          null,
+          'Request rejected by manager. Reason: No reason provided',
+          0
+        ]
+      );
+    });
+
+    it('should reject request with empty reason and use default message', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: ''
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'rejected',
+        reason: null // Empty string becomes null due to reason || null logic
+      });
+
+      // Verify the rejection update query was called with default message for empty reason
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE query_requests'),
+        [2, '1', '\n[REJECTED] No reason provided']
+      );
+    });
+
+    it('should return 404 when rejecting non-existent request', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [] }); // No rows updated (request not found)
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/999/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Request not found or already processed'
+      });
+
+      // Verify audit log was not created since request wasn't found
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 404 when rejecting already processed request', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [] }); // No rows updated (already processed)
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Already processed'
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Request not found or already processed'
+      });
+    });
+
+    it('should handle database error during rejection update', async () => {
+      const mockQuery = jest.fn()
+        .mockRejectedValueOnce(new Error('Database connection failed'));
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Approval action failed'
+      });
+    });
+
+    it('should handle database error during audit log creation', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update succeeds
+        .mockRejectedValueOnce(new Error('Audit log insertion failed')); // Audit log fails
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: 'Test reason'
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Approval action failed'
+      });
+    });
+
+    it('should reject request with long reason text', async () => {
+      const longReason = 'This is a very long rejection reason that explains in detail why the request cannot be approved. '.repeat(5);
+      
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: longReason
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'rejected',
+        reason: longReason
+      });
+
+      // Verify the long reason was stored correctly
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE query_requests'),
+        [2, '1', `\n[REJECTED] ${longReason}`]
+      );
+    });
+
+    it('should reject request with special characters in reason', async () => {
+      const specialReason = "Query contains SQL injection: '; DROP TABLE users; --";
+      
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ 
+          action: 'reject',
+          reason: specialReason
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        status: 'rejected',
+        reason: specialReason
+      });
+
+      // Verify special characters are handled correctly
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE query_requests'),
+        [2, '1', `\n[REJECTED] ${specialReason}`]
+      );
+    });
+  });
+});
