@@ -54,7 +54,10 @@ describe('Approval Controller', () => {
         .get('/api/v1/approvals');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ success: true, requests: [] });
+      expect(response.body).toEqual({
+        success: true,
+        requests: []
+      });
     });
   });
 
@@ -226,7 +229,7 @@ describe('Approval Controller - Execution Triggering', () => {
     it('should not trigger execution for request without query or script', async () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
-          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // Check request exists
+          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // Check request exists
           .mockResolvedValueOnce({ 
             rows: [{ 
               id: 1, 
@@ -250,7 +253,7 @@ describe('Approval Controller - Execution Triggering', () => {
     it('should reject request successfully', async () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
-          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // Check request exists
+          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // Check request exists
           .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update query
           .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Insert execution log
       }));
@@ -275,7 +278,7 @@ describe('Approval Controller - Execution Triggering', () => {
     it('should handle invalid action', async () => {
       jest.doMock('../../src/config/db', () => ({
         query: jest.fn()
-          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // Check request exists
+          .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // Check request exists
       }));
 
       const appWithManager = require('../../src/app');
@@ -310,7 +313,7 @@ describe('Approval Controller - Rejection Workflow', () => {
   describe('POST /api/v1/approvals/:req_id/action - Rejection Tests', () => {
     it('should reject request with reason and store in comments', async () => {
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
 
@@ -337,7 +340,7 @@ describe('Approval Controller - Rejection Workflow', () => {
 
     it('should reject request without reason and use default message', async () => {
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
 
@@ -361,7 +364,7 @@ describe('Approval Controller - Rejection Workflow', () => {
 
     it('should reject request with empty reason and use default message', async () => {
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
 
@@ -406,7 +409,7 @@ describe('Approval Controller - Rejection Workflow', () => {
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
         success: false,
-        message: 'Request not found or already processed'
+        message: 'Request not found'
       });
 
       // Verify only POD check was called since request wasn't found
@@ -433,7 +436,7 @@ describe('Approval Controller - Rejection Workflow', () => {
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
         success: false,
-        message: 'Request not found or already processed'
+        message: 'Request not found'
       });
     });
 
@@ -463,7 +466,7 @@ describe('Approval Controller - Rejection Workflow', () => {
 
     it('should handle database error during audit log creation', async () => {
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update succeeds
         .mockRejectedValueOnce(new Error('Audit log insertion failed')); // Audit log fails
 
@@ -491,7 +494,7 @@ describe('Approval Controller - Rejection Workflow', () => {
       const longReason = 'This is a very long rejection reason that explains in detail why the request cannot be approved. '.repeat(5);
       
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
 
@@ -520,7 +523,7 @@ describe('Approval Controller - Rejection Workflow', () => {
       const specialReason = "Query contains SQL injection: '; DROP TABLE users; --";
       
       const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // Update request status
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // Insert audit log
 
@@ -542,6 +545,71 @@ describe('Approval Controller - Rejection Workflow', () => {
         success: true,
         status: 'rejected',
         reason: specialReason
+      });
+    });
+  });
+
+  describe('GET /api/v1/approvals - Negative Validation', () => {
+    it('should return error when limit is negative', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+          next();
+        };
+      });
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .get('/api/v1/approvals?limit=-5&offset=0');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Limit cannot be negative'
+      });
+    });
+
+    it('should return error when offset is negative', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+          next();
+        };
+      });
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .get('/api/v1/approvals?limit=10&offset=-10');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Offset cannot be negative'
+      });
+    });
+
+    it('should return error when both limit and offset are negative', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+          next();
+        };
+      });
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .get('/api/v1/approvals?limit=-5&offset=-10');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Limit cannot be negative'
       });
     });
   });

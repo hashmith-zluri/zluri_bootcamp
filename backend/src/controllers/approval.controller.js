@@ -1,6 +1,6 @@
-const { query } = require("../config/db");
 const pods = require("../config/pods");
 const executionService = require("../services/execution.service");
+const approvalService = require("../services/approval.service");
 
 const getApprovalRequests = async (req, res) => {
   const managerEmail = req.user?.email;
@@ -16,42 +16,44 @@ const getApprovalRequests = async (req, res) => {
     .map(pod => pod.id);
 
   if (managedPods.length === 0) {
-    return res.status(200).json({ success: true, requests: [] });
+    return res.status(200).json({
+      success: true,
+      requests: []
+    });
   }
 
   try {
-    const result = await query(
-      `
-      SELECT
-        qr.id AS reqid,
-        qr.query_text,
-        qr.script_path,
-        qr.status,
-        qr.database_name,
-        qr.comments,
-        qr.pod_id,
-        qr.created_at,
-        qr.approved_at,
-        u.email AS requester_email,
-        u.name AS requester_name,
-        di.name AS instance_name,
-        di.engine AS database_type,
-        el.output,
-        el.error,
-        el.execution_time_ms,
-        el.executed_at,
-        el.success
-      FROM query_requests qr
-      JOIN users u ON qr.requester_id = u.id
-      JOIN db_instances di ON qr.db_instance_id = di.id
-      LEFT JOIN execution_logs el ON el.request_id = qr.id
-      WHERE qr.pod_id = ANY($1)
-      ORDER BY qr.created_at DESC
-      `,
-      [managedPods]
-    );
+    // Extract query parameters
+    const {
+      status,
+      sortBy,
+      limit,
+      offset
+    } = req.query;
 
-    const requests = result.rows.map(row => ({
+    // Validate limit and offset if provided
+    if (limit !== undefined && parseInt(limit) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Limit cannot be negative"
+      });
+    }
+
+    if (offset !== undefined && parseInt(offset) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Offset cannot be negative"
+      });
+    }
+
+    const rows = await approvalService.getApprovalRequestsByPods(managedPods, {
+      status,
+      sortBy,
+      limit: limit ? parseInt(limit) : null,
+      offset: offset ? parseInt(offset) : null
+    });
+
+    const requests = rows.map(row => ({
       req_id: row.reqid,
       query: row.query_text,
       script: row.script_path,
@@ -76,7 +78,10 @@ const getApprovalRequests = async (req, res) => {
         : null
     }));
 
-    return res.status(200).json({ success: true, requests });
+    return res.status(200).json({
+      success: true,
+      requests
+    });
 
   } catch (error) {
     console.error("Approval list fetch failed:", error);
@@ -122,19 +127,24 @@ const approveOrReject = async (req, res) => {
   
     try {
       // Verify manager owns the POD for this request
-      const requestCheck = await query(
-        'SELECT pod_id FROM query_requests WHERE id = $1 AND status = \'PENDING\'',
-        [req_id]
-      );
+      const request = await approvalService.getRequestById(req_id);
 
-      if (requestCheck.rows.length === 0) {
+      if (!request) {
         return res.status(404).json({
           success: false,
-          message: "Request not found or already processed"
+          message: "Request not found"
         });
       }
 
-      const requestPodId = requestCheck.rows[0].pod_id;
+      // Check if request is already processed
+      if (request.status !== 'PENDING') {
+        return res.status(400).json({
+          success: false,
+          message: `Request already processed. Current status: ${request.status}`
+        });
+      }
+
+      const requestPodId = request.pod_id;
       if (!managedPods.includes(requestPodId)) {
         return res.status(403).json({
           success: false,
@@ -144,29 +154,17 @@ const approveOrReject = async (req, res) => {
 
       if (action === "approve") {
         // Update request status to APPROVED
-        const updateResult = await query(
-          `
-          UPDATE query_requests
-          SET status = 'APPROVED',
-              approved_by = $1,
-              approved_at = NOW()
-          WHERE id = $2 AND status = 'PENDING'
-          RETURNING id, query_text, script_path
-          `,
-          [approverId, req_id]
-        );
+        const approvedRequest = await approvalService.approveRequest(req_id, approverId);
 
-        if (updateResult.rows.length === 0) {
+        if (!approvedRequest) {
           return res.status(404).json({
             success: false,
             message: "Request not found or already processed"
           });
         }
-
-        const request = updateResult.rows[0];
         
         // Trigger execution for approved requests
-        if (request.query_text) {
+        if (approvedRequest.query_text) {
           console.log(`Triggering query execution for approved request ${req_id}`);
           
           // Execute query asynchronously (don't wait for completion)
@@ -177,7 +175,7 @@ const approveOrReject = async (req, res) => {
             .catch(error => /*istanbul ignore next*/{
               console.error(`Query execution error for request ${req_id}:`, error.message);
             });
-        } else if (request.script_path) {
+        } else if (approvedRequest.script_path) {
           console.log(`Triggering script execution for approved request ${req_id}`);
           
           // Execute script asynchronously - executionService handles routing to correct engine
@@ -194,22 +192,10 @@ const approveOrReject = async (req, res) => {
       }
       if (action === "reject") {
         // Update request status to REJECTED and store rejection reason
-        const rejectionComment = reason ? `\n[REJECTED] ${reason}` : '\n[REJECTED] No reason provided';
+        const rejectedRequest = await approvalService.rejectRequest(req_id, approverId, reason);
         
-        const updateResult = await query(
-          `
-          UPDATE query_requests
-          SET status = 'REJECTED',
-              approved_by = $1,
-              approved_at = NOW(),
-              comments = COALESCE(comments, '') || $3
-          WHERE id = $2 AND status = 'PENDING'
-          RETURNING id
-          `,
-          [approverId, req_id, rejectionComment]
-        );
         //istanbul ignore next/
-        if (updateResult.rows.length === 0) {
+        if (!rejectedRequest) {
           return res.status(404).json({
             success: false,
             message: "Request not found or already processed"
@@ -217,18 +203,7 @@ const approveOrReject = async (req, res) => {
         }
 
         // Log the rejection for audit purposes
-        await query(
-          `INSERT INTO execution_logs 
-           (request_id, success, output, error, execution_time_ms) 
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            req_id,
-            false,
-            null,
-            `Request rejected by manager. Reason: ${reason || 'No reason provided'}`,
-            0
-          ]
-        );
+        await approvalService.logRejection(req_id, reason);
   
         return res.status(200).json({
           success: true,
@@ -252,19 +227,14 @@ const getExecutionResult = async (req, res) => {
 
   try {
     // Verify user owns this request or is a manager/admin
-    const requestResult = await query(
-      'SELECT requester_id FROM query_requests WHERE id = $1',
-      [req_id]
-    );
+    const request = await approvalService.getRequestOwnership(req_id);
 
-    if (requestResult.rows.length === 0) {
+    if (!request) {
       return res.status(404).json({
         success: false,
         message: "Request not found"
       });
     }
-
-    const request = requestResult.rows[0];
     const userRole = req.user?.role;
 
     // Check access permissions

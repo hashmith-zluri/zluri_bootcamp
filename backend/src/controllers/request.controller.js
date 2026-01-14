@@ -1,4 +1,4 @@
-const { query } = require("../config/db");
+const requestService = require("../services/request.service");
 
 const submitRequest = async (req, res) => {
   const {
@@ -46,37 +46,20 @@ const submitRequest = async (req, res) => {
     // Convert script buffer to string if script is provided
     const scriptContent = hasScript ? scriptFile.buffer.toString('utf8') : null;
     
-    const result = await query(
-      `
-      INSERT INTO query_requests
-        (
-          requester_id,
-          db_instance_id,
-          database_name,
-          query_text,
-          script_path,
-          comments,
-          pod_id,
-          status
-        )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
-      RETURNING id, status
-      `,
-      [
-        userId,
-        instance_id,
-        db_name,
-        hasQuery ? queryText : null,
-        hasScript ? scriptContent : null, // Store script content instead of path
-        comments,
-        pod_id
-      ]
-    );
+    const createdRequest = await requestService.createRequest({
+      userId,
+      instanceId: instance_id,
+      dbName: db_name,
+      queryText: hasQuery ? queryText : null,
+      scriptContent,
+      comments,
+      podId: pod_id
+    });
 
     return res.status(201).json({
       success: true,
-      req_id: result.rows[0].id,
-      status: result.rows[0].status
+      req_id: createdRequest.id,
+      status: createdRequest.status
     });
 
   } catch (error) {
@@ -99,36 +82,37 @@ const getMyRequests = async (req, res) => {
   }
 
   try {
-    const result = await query(
-      `
-      SELECT
-        qr.id AS reqid,
-        qr.query_text,
-        qr.script_path,
-        qr.status,
-        qr.database_name,
-        qr.comments,
-        qr.created_at,
-        qr.approved_at,
-        di.name AS instance_name,
-        di.engine AS database_type,
-        el.output,
-        el.error,
-        el.execution_time_ms,
-        el.executed_at,
-        el.success
-      FROM query_requests qr
-      JOIN db_instances di
-        ON qr.db_instance_id = di.id
-      LEFT JOIN execution_logs el
-        ON el.request_id = qr.id
-      WHERE qr.requester_id = $1
-      ORDER BY qr.created_at DESC
-      `,
-      [userId]
-    );
+    // Extract query parameters
+    const {
+      status,
+      sortBy,
+      limit,
+      offset
+    } = req.query;
 
-    const requests = result.rows.map(row => ({
+    // Validate limit and offset if provided
+    if (limit !== undefined && parseInt(limit) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Limit cannot be negative"
+      });
+    }
+
+    if (offset !== undefined && parseInt(offset) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Offset cannot be negative"
+      });
+    }
+
+    const rows = await requestService.getUserRequests(userId, {
+      status,
+      sortBy,
+      limit: limit ? parseInt(limit) : null,
+      offset: offset ? parseInt(offset) : null
+    });
+
+    const requests = rows.map(row => ({
       req_id: row.reqid,
       query: row.query_text,
       script: row.script_path,
@@ -150,7 +134,10 @@ const getMyRequests = async (req, res) => {
         : null
     }));
 
-    return res.status(200).json({ success: true, requests });
+    return res.status(200).json({
+      success: true,
+      requests
+    });
 
   } catch (error) {
     console.error("Fetch user requests failed:", error);

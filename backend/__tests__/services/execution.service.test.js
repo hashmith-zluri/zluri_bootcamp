@@ -1,6 +1,6 @@
 const executionService = require('../../src/services/execution.service');
 const postgresExecutionService = require('../../src/services/postgres.service');
-const mongoExecutionService = require('../../src/services/mongoExecution.service');
+const mongoExecutionService = require('../../src/services/mongo.service');
 const postgresScriptService = require('../../src/services/postgresScript.service');
 const mongoScriptService = require('../../src/services/mongoScript.service');
 const { query } = require('../../src/config/db');
@@ -18,7 +18,7 @@ jest.mock('../../src/services/postgres.service', () => ({
   logExecution: jest.fn()
 }));
 
-jest.mock('../../src/services/mongoExecution.service', () => ({
+jest.mock('../../src/services/mongo.service', () => ({
   executeMongoQuery: jest.fn(),
   getExecutionResult: jest.fn(),
   executeMultipleQueries: jest.fn()
@@ -107,7 +107,7 @@ describe('Execution Service', () => {
         rows: [{ engine: 'MYSQL', query_text: 'SELECT 1', script_path: null }]
       });
 
-      await expect(executionService.executeQuery(5)).rejects.toThrow('Unsupported database engine');
+      await expect(executionService.executeQuery(5)).rejects.toThrow('Query execution not supported for engine');
     });
 
     it('should throw error for unsupported engine with script', async () => {

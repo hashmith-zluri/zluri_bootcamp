@@ -1,4 +1,4 @@
-const { query } = require("../config/db");
+const dbService = require("../services/db.service");
 
 const dbController = {
   getDbTypes: (req, res) => {
@@ -14,10 +14,10 @@ const dbController = {
       });
     }
     try {
-      const result = await query("SELECT id, name FROM db_instances WHERE engine = $1 ORDER BY name", [type.toUpperCase()]);
+      const instances = await dbService.getInstancesByType(type);
       res.status(200).json({
         success: true,
-        instances: result.rows.map(row => ({ id: String(row.id), name: row.name }))
+        instances: instances.map(row => ({ id: String(row.id), name: row.name }))
       });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -28,38 +28,18 @@ const dbController = {
     const { id } = req.params;
     try {
       // Get the instance details from our portal database
-      const instanceResult = await query(
-        "SELECT name, host, port, engine FROM db_instances WHERE id = $1", 
-        [id]
-      );
+      const instance = await dbService.getInstanceById(id);
       
-      if (instanceResult.rows.length === 0) {
+      if (!instance) {
         return res.status(404).json({ 
           success: false, 
           message: "Instance not found" 
         });
       }
-
-      const instance = instanceResult.rows[0];
       
-      if (instance.engine === "POSTGRES") {
-        // Get databases for this PostgreSQL instance from instance_databases table
-        const dbResult = await query(
-          'SELECT database_name FROM instance_databases WHERE instance_id = $1 ORDER BY database_name',
-          [id]
-        );
-        
-        const databases = dbResult.rows.map(row => row.database_name);
-        res.status(200).json({ success: true, databases });
-        
-      } else if (instance.engine === "MONGO") {
-        // Get databases for this MongoDB instance from instance_databases table
-        const dbResult = await query(
-          'SELECT database_name FROM instance_databases WHERE instance_id = $1 ORDER BY database_name',
-          [id]
-        );
-        
-        const databases = dbResult.rows.map(row => row.database_name);
+      if (instance.engine === "POSTGRES" || instance.engine === "MONGO") {
+        // Get databases for this instance from instance_databases table
+        const databases = await dbService.getDatabasesByInstanceId(id);
         res.status(200).json({ success: true, databases });
         
       } else {

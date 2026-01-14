@@ -217,6 +217,39 @@ describe('Request Controller', () => {
         message: 'Failed to fetch requests'
       });
     });
+
+    it('should return error when limit is negative', async () => {
+      const response = await request(app)
+        .get('/api/v1/request/mine?limit=-5&offset=0');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Limit cannot be negative'
+      });
+    });
+
+    it('should return error when offset is negative', async () => {
+      const response = await request(app)
+        .get('/api/v1/request/mine?limit=10&offset=-10');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Offset cannot be negative'
+      });
+    });
+
+    it('should return error when both limit and offset are negative', async () => {
+      const response = await request(app)
+        .get('/api/v1/request/mine?limit=-5&offset=-10');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Limit cannot be negative'
+      });
+    });
   });
 });
 

@@ -138,14 +138,6 @@ class PostgresScriptExecutionService {
     }
   }
 
-  async executeSQLScript(instance, databaseName, scriptContent, startTime) {
-    return {
-      success: false,
-      error: 'SQL scripts are not supported. Please use JavaScript (.js) files only.',
-      executionTime: Date.now() - startTime
-    };
-  }
-
   async executeJSScript(instance, databaseName, scriptContent, startTime) {
     return new Promise((resolve) => {
       const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');

@@ -1,4 +1,4 @@
-const mongoExecutionService = require('../../src/services/mongoExecution.service');
+const mongoExecutionService = require('../../src/services/mongo.service');
 const { query } = require('../../src/config/db');
 
 jest.mock('../../src/config/db');

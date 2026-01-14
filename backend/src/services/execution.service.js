@@ -1,5 +1,5 @@
 const postgresExecutionService = require('./postgres.service');
-const mongoExecutionService = require('./mongoExecution.service');
+const mongoExecutionService = require('./mongo.service');
 const postgresScriptExecutionService = require('./postgresScript.service');
 const mongoScriptExecutionService = require('./mongoScript.service');
 const { query } = require('../config/db');
@@ -23,29 +23,35 @@ class ExecutionService {
 
       const { engine, query_text, script_path } = requestResult.rows[0];
 
-      // Route based on request type and engine
-      if (script_path) {
-        // Script execution
-        if (engine === 'POSTGRES') {
-          return await postgresScriptExecutionService.executePostgresScript(requestId);
-        } else if (engine === 'MONGO') {
-          return await mongoScriptExecutionService.executeMongoScript(requestId);
-        } else {
-          throw new Error(`Script execution not supported for engine: ${engine}`);
-        }
-      } else if (query_text) {
-        // Query execution
-        switch (engine) {
-          case 'POSTGRES':
-            return await postgresExecutionService.executePostgresQuery(requestId);
-          case 'MONGO':
-            return await mongoExecutionService.executeMongoQuery(requestId);
-          default:
-            throw new Error(`Unsupported database engine: ${engine}`);
-        }
-      } else {
-        throw new Error('Request has neither query text nor script path');
+      // Route based on request type and engine using strategy pattern
+      const scriptExecutors = {
+        POSTGRES: () => postgresScriptExecutionService.executePostgresScript(requestId),
+        MONGO: () => mongoScriptExecutionService.executeMongoScript(requestId)
+      };
+
+      const queryExecutors = {
+        POSTGRES: () => postgresExecutionService.executePostgresQuery(requestId),
+        MONGO: () => mongoExecutionService.executeMongoQuery(requestId)
+      };
+
+      // Execute based on request type
+      const hasScript = Boolean(script_path);
+      const hasQuery = Boolean(query_text);
+      
+      const executor = hasScript 
+        ? scriptExecutors[engine] 
+        : hasQuery 
+          ? queryExecutors[engine] 
+          : null;
+
+      if (!executor) {
+        const errorMessage = hasScript || hasQuery
+          ? `${hasScript ? 'Script' : 'Query'} execution not supported for engine: ${engine}`
+          : 'Request has neither query text nor script path';
+        throw new Error(errorMessage);
       }
+
+      return await executor();
     } catch (error) {
       console.error(`Generic execution failed for request ${requestId}:`, error.message);
       throw error;
@@ -79,18 +85,24 @@ class ExecutionService {
         [requestId]
       );
       
-      if (requestCheck.rows.length > 0 && requestCheck.rows[0].script_path) {
-        const engine = requestCheck.rows[0].engine;
-        // Use appropriate script execution service based on engine
-        if (engine === 'MONGO') {
-          return await mongoScriptExecutionService.getScriptExecutionResult(requestId);
-        } else {
-          return await postgresScriptExecutionService.getScriptExecutionResult(requestId);
-        }
-      } else {
-        // Use regular execution service for query results
-        return await postgresExecutionService.getExecutionResult(requestId);
-      }
+      const hasScriptRequest = requestCheck.rows.length > 0 && requestCheck.rows[0].script_path;
+      
+      const resultServices = {
+        script: {
+          MONGO: () => mongoScriptExecutionService.getScriptExecutionResult(requestId),
+          default: () => postgresScriptExecutionService.getScriptExecutionResult(requestId)
+        },
+        query: () => postgresExecutionService.getExecutionResult(requestId)
+      };
+
+      const serviceType = hasScriptRequest ? 'script' : 'query';
+      const engine = hasScriptRequest ? requestCheck.rows[0].engine : null;
+      
+      const service = hasScriptRequest 
+        ? (resultServices.script[engine] || resultServices.script.default)
+        : resultServices.query;
+
+      return await service();
     } catch (error) {
       console.error(`Failed to get execution result for request ${requestId}:`, error.message);
       throw error;

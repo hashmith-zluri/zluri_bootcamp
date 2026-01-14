@@ -342,15 +342,6 @@ describe('PostgreSQL Script Service', () => {
     });
   });
 
-  describe('executeSQLScript', () => {
-    it('should return error for SQL scripts', async () => {
-      const result = await postgresScriptService.executeSQLScript({}, 'test_db', 'SELECT 1;', Date.now());
-      
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('SQL scripts are not supported');
-    });
-  });
-
   describe('executeScript', () => {
     it('should handle instance query error', async () => {
       query.mockResolvedValue({ rows: [] });

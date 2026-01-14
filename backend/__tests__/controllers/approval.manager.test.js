@@ -147,7 +147,7 @@ describe('Approval Controller - Manager Access', () => {
       // First call: POD check query
       // Second call: Update query
       query
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check - manager owns POD 1
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check - manager owns POD 1
         .mockResolvedValueOnce({ rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }] }); // Update
       executionService.executeQuery.mockResolvedValue({ success: true });
 
@@ -162,7 +162,7 @@ describe('Approval Controller - Manager Access', () => {
 
     it('should approve script request and trigger script execution', async () => {
       query
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1, query_text: null, script_path: 'test script content' }] }); // Update
       executionService.executeQuery.mockResolvedValue({ success: true });
 
@@ -177,7 +177,7 @@ describe('Approval Controller - Manager Access', () => {
 
     it('should return 403 when manager tries to approve request from different POD', async () => {
       // Request belongs to POD 2, but manager only manages POD 1
-      query.mockResolvedValueOnce({ rows: [{ pod_id: 'pod-2' }] });
+      query.mockResolvedValueOnce({ rows: [{ pod_id: 'pod-2', status: 'PENDING' }] });
 
       const response = await request(app)
         .post('/api/v1/approvals/1/action')
@@ -212,7 +212,7 @@ describe('Approval Controller - Manager Access', () => {
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
         success: false,
-        message: 'Request not found or already processed'
+        message: 'Request not found'
       });
     });
 
@@ -232,7 +232,7 @@ describe('Approval Controller - Manager Access', () => {
 
     it('should handle query execution error in async callback', async () => {
       query
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1, query_text: 'SELECT * FROM users', script_path: null }] }); // Update
       executionService.executeQuery.mockRejectedValue(new Error('Execution failed'));
 
@@ -247,7 +247,7 @@ describe('Approval Controller - Manager Access', () => {
 
     it('should handle script execution error in async callback', async () => {
       query
-        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1' }] }) // POD check
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // POD check
         .mockResolvedValueOnce({ rows: [{ id: 1, query_text: null, script_path: 'console.log("test")' }] }); // Update
       executionService.executeQuery.mockRejectedValue(new Error('Script execution failed'));
 
