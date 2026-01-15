@@ -80,7 +80,8 @@ describe('Request Controller', () => {
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields',
+        missing_fields: ['comments', 'pod_id']
       });
       expect(query).not.toHaveBeenCalled();
     });
@@ -223,10 +224,8 @@ describe('Request Controller', () => {
         .get('/api/v1/request/mine?limit=-5&offset=0');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Limit cannot be negative'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Limit must be +ve integer.');
     });
 
     it('should return error when offset is negative', async () => {
@@ -234,10 +233,8 @@ describe('Request Controller', () => {
         .get('/api/v1/request/mine?limit=10&offset=-10');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Offset cannot be negative'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Offset must be +ve integer.');
     });
 
     it('should return error when both limit and offset are negative', async () => {
@@ -245,10 +242,26 @@ describe('Request Controller', () => {
         .get('/api/v1/request/mine?limit=-5&offset=-10');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Limit cannot be negative'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Limit must be +ve integer.');
+    });
+
+    it('should return error when limit is a decimal', async () => {
+      const response = await request(app)
+        .get('/api/v1/request/mine?limit=1.5');
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Limit must be +ve integer.');
+    });
+
+    it('should return error when offset is a decimal', async () => {
+      const response = await request(app)
+        .get('/api/v1/request/mine?offset=0.5');
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Offset must be +ve integer.');
     });
   });
 });
@@ -347,5 +360,200 @@ describe('Request Controller - Edge Cases', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.message).toBe('Missing required fields');
+  });
+
+  it('should return 400 when instance_id is missing', async () => {
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn()
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 1
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.missing_fields).toContain('instance_id');
+  });
+
+  it('should return 400 when userId is missing (no user)', async () => {
+    jest.resetModules();
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
+      return (req, res, next) => {
+        req.user = {}; // User object exists but no id
+        next();
+      };
+    });
+
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn()
+    }));
+
+    const appNoUserId = require('../../src/app');
+    
+    const response = await request(appNoUserId)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 1
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.missing_fields).toContain('userId');
+  });
+});
+
+describe('Request Controller - Result Status Mapping', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+    
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
+      return (req, res, next) => {
+        req.user = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
+        next();
+      };
+    });
+  });
+
+  it('should map success=true to status success', async () => {
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn().mockResolvedValue({
+        rows: [{
+          reqid: 1,
+          query_text: 'SELECT 1',
+          script_path: null,
+          status: 'EXECUTED',
+          database_name: 'test_db',
+          comments: 'Test',
+          created_at: '2024-01-01T00:00:00Z',
+          approved_at: '2024-01-01T01:00:00Z',
+          instance_name: 'postgres-prod',
+          database_type: 'POSTGRES',
+          output: 'Result',
+          error: null,
+          execution_time_ms: 100,
+          executed_at: '2024-01-01T01:05:00Z',
+          success: true
+        }]
+      })
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .get('/api/v1/request/mine');
+
+    expect(response.status).toBe(200);
+    expect(response.body.requests[0].result.status).toBe('success');
+  });
+
+  it('should map success=false to status failure', async () => {
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn().mockResolvedValue({
+        rows: [{
+          reqid: 1,
+          query_text: 'SELECT 1',
+          script_path: null,
+          status: 'FAILED',
+          database_name: 'test_db',
+          comments: 'Test',
+          created_at: '2024-01-01T00:00:00Z',
+          approved_at: '2024-01-01T01:00:00Z',
+          instance_name: 'postgres-prod',
+          database_type: 'POSTGRES',
+          output: null,
+          error: 'Error occurred',
+          execution_time_ms: 50,
+          executed_at: '2024-01-01T01:05:00Z',
+          success: false
+        }]
+      })
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .get('/api/v1/request/mine');
+
+    expect(response.status).toBe(200);
+    expect(response.body.requests[0].result.status).toBe('failure');
+  });
+});
+
+describe('Request Controller - Body Parsing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+    
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
+      return (req, res, next) => {
+        req.user = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
+        next();
+      };
+    });
+  });
+
+  it('should use req.body when it exists', async () => {
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn().mockResolvedValue({
+        rows: [{ id: 1, status: 'PENDING' }]
+      })
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 1
+      });
+
+    expect(response.status).toBe(201);
+  });
+
+  it('should handle pagination with limit and offset in getMyRequests', async () => {
+    jest.doMock('../../src/config/db', () => ({
+      query: jest.fn().mockResolvedValue({
+        rows: [{
+          reqid: 1,
+          query_text: 'SELECT 1',
+          script_path: null,
+          status: 'PENDING',
+          database_name: 'test_db',
+          comments: 'Test',
+          created_at: '2024-01-01T00:00:00Z',
+          approved_at: null,
+          instance_name: 'postgres-prod',
+          database_type: 'POSTGRES',
+          output: null,
+          error: null,
+          execution_time_ms: null,
+          executed_at: null,
+          success: null
+        }]
+      })
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .get('/api/v1/request/mine?limit=10&offset=5');
+
+    expect(response.status).toBe(200);
+    expect(response.body.requests).toHaveLength(1);
   });
 });

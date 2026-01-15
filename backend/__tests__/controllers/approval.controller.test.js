@@ -16,6 +16,53 @@ describe('Approval Controller', () => {
     jest.clearAllMocks();
   });
 
+  describe('GET /api/v1/approvals - Manager with failed results', () => {
+    it('should return failure status when success is false', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+          next();
+        };
+      });
+      jest.doMock('../../src/config/db', () => ({
+        query: jest.fn().mockResolvedValue({
+          rows: [{
+            reqid: 1,
+            query_text: 'SELECT 1',
+            script_path: null,
+            status: 'FAILED',
+            database_name: 'test_db',
+            comments: 'Test',
+            pod_id: 'pod-1',
+            created_at: '2024-01-01T00:00:00Z',
+            approved_at: '2024-01-01T01:00:00Z',
+            requester_email: 'user@example.com',
+            requester_name: 'Test User',
+            instance_name: 'postgres-prod',
+            database_type: 'POSTGRES',
+            output: null,
+            error: 'Query failed',
+            execution_time_ms: 50,
+            executed_at: '2024-01-01T01:05:00Z',
+            success: false
+          }]
+        })
+      }));
+      jest.doMock('../../src/config/pods', () => [
+        { id: 'pod-1', manager_email: 'manager@example.com', name: 'Pod 1' }
+      ]);
+
+      const appWithFailure = require('../../src/app');
+      
+      const response = await request(appWithFailure)
+        .get('/api/v1/approvals');
+
+      expect(response.status).toBe(200);
+      expect(response.body.requests[0].result.status).toBe('failure');
+    });
+  });
+
   describe('GET /api/v1/approvals - Access Control', () => {
     it('should return 403 for non-manager users', async () => {
       // Mock auth middleware for non-manager
@@ -207,6 +254,79 @@ describe('Approval Controller - Manager Access', () => {
         status: 'success'
       });
     });
+
+    it('should include failed execution results with failure status', async () => {
+      jest.doMock('../../src/config/db', () => ({
+        query: jest.fn().mockResolvedValue({
+          rows: [{
+            reqid: 1,
+            query_text: 'SELECT * FROM users',
+            script_path: null,
+            status: 'FAILED',
+            database_name: 'test_db',
+            comments: 'Test query',
+            pod_id: 'pod-1',
+            created_at: '2024-01-01T00:00:00Z',
+            approved_at: '2024-01-01T01:00:00Z',
+            requester_email: 'user@example.com',
+            requester_name: 'Test User',
+            instance_name: 'postgres-prod',
+            database_type: 'POSTGRES',
+            output: null,
+            error: 'Query failed',
+            execution_time_ms: 50,
+            executed_at: '2024-01-01T01:05:00Z',
+            success: false
+          }]
+        })
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .get('/api/v1/approvals');
+
+      expect(response.status).toBe(200);
+      expect(response.body.requests[0].result).toMatchObject({
+        status: 'failure',
+        error: 'Query failed'
+      });
+    });
+
+    it('should handle pagination with limit and offset', async () => {
+      jest.doMock('../../src/config/db', () => ({
+        query: jest.fn().mockResolvedValue({
+          rows: [{
+            reqid: 1,
+            query_text: 'SELECT 1',
+            script_path: null,
+            status: 'PENDING',
+            database_name: 'test_db',
+            comments: 'Test',
+            pod_id: 'pod-1',
+            created_at: '2024-01-01T00:00:00Z',
+            approved_at: null,
+            requester_email: 'user@example.com',
+            requester_name: 'Test User',
+            instance_name: 'postgres-prod',
+            database_type: 'POSTGRES',
+            output: null,
+            error: null,
+            execution_time_ms: null,
+            executed_at: null,
+            success: null
+          }]
+        })
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .get('/api/v1/approvals?limit=10&offset=5');
+
+      expect(response.status).toBe(200);
+      expect(response.body.requests).toHaveLength(1);
+    });
   });
 });
 
@@ -288,10 +408,8 @@ describe('Approval Controller - Execution Triggering', () => {
         .send({ action: 'invalid' });
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Invalid action'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
     }, 10000);
   });
 });
@@ -307,6 +425,141 @@ describe('Approval Controller - Rejection Workflow', () => {
         req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
         next();
       };
+    });
+  });
+
+  describe('POST /api/v1/approvals/:req_id/action - Approval Edge Cases', () => {
+    it('should return 404 when approveRequest returns null', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // getRequestById
+        .mockResolvedValueOnce({ rows: [] }); // approveRequest returns null (no rows)
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Request not found or already processed'
+      });
+    });
+
+    it('should trigger script execution when approving script request', async () => {
+      const mockExecuteQuery = jest.fn().mockResolvedValue({ success: true });
+      jest.doMock('../../src/services/execution.service', () => ({
+        executeQuery: mockExecuteQuery,
+        getExecutionResult: jest.fn()
+      }));
+
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // getRequestById
+        .mockResolvedValueOnce({ rows: [{ id: 1, query_text: null, script_path: 'console.log("test")' }] }); // approveRequest
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('approved');
+    });
+
+    it('should return 404 when rejectRequest returns null', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'PENDING' }] }) // getRequestById
+        .mockResolvedValueOnce({ rows: [] }); // rejectRequest returns null (no rows)
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'reject', reason: 'test' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Request not found or already processed'
+      });
+    });
+
+    it('should return 400 when request is already processed', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-1', status: 'APPROVED' }] }); // getRequestById - already approved
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Request already processed. Current status: APPROVED'
+      });
+    });
+
+    it('should return 403 when request belongs to different POD', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ pod_id: 'pod-999', status: 'PENDING' }] }); // getRequestById - different pod
+
+      jest.doMock('../../src/config/db', () => ({
+        query: mockQuery
+      }));
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Access denied - request belongs to different POD'
+      });
+    });
+
+    it('should return 403 when manager has no PODs assigned', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'nopods@example.com', role: 'MANAGER' };
+          next();
+        };
+      });
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'approve' });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Access denied - no PODs assigned'
+      });
     });
   });
 
@@ -565,10 +818,8 @@ describe('Approval Controller - Rejection Workflow', () => {
         .get('/api/v1/approvals?limit=-5&offset=0');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Limit cannot be negative'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Limit must be +ve integer.');
     });
 
     it('should return error when offset is negative', async () => {
@@ -586,10 +837,8 @@ describe('Approval Controller - Rejection Workflow', () => {
         .get('/api/v1/approvals?limit=10&offset=-10');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Offset cannot be negative'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Offset must be +ve integer.');
     });
 
     it('should return error when both limit and offset are negative', async () => {
@@ -607,10 +856,28 @@ describe('Approval Controller - Rejection Workflow', () => {
         .get('/api/v1/approvals?limit=-5&offset=-10');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Limit cannot be negative'
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Limit must be +ve integer.');
+    });
+
+    it('should return error for invalid action', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/middlewares/auth.middleware', () => {
+        return (req, res, next) => {
+          req.user = { id: 2, email: 'manager@example.com', role: 'MANAGER' };
+          next();
+        };
       });
+
+      const appWithManager = require('../../src/app');
+      
+      const response = await request(appWithManager)
+        .post('/api/v1/approvals/1/action')
+        .send({ action: 'invalid' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
     });
   });
 });

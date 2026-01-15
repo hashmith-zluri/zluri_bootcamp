@@ -10,18 +10,21 @@ const submitRequest = async (req, res) => {
   } = req.body || {};
 
   const userId = req.user?.id;
-  const scriptFile = req.file; // Now contains buffer, not file path
+  const scriptFile = req.file;
 
-  if (
-    instance_id === undefined ||
-    !db_name ||
-    !comments ||
-    !pod_id ||
-    !userId
-  ) {
+  const miss = [];
+
+  if (instance_id === undefined) miss.push("instance_id");
+  if (!db_name) miss.push("db_name");
+  if (!comments) miss.push("comments");
+  if (!pod_id) miss.push("pod_id");
+  if (!userId) miss.push("userId");
+
+  if (miss.length > 0) {
     return res.status(400).json({
       success: false,
-      message: "Missing required fields"
+      message: "Missing required fields",
+      missing_fields: miss
     });
   }
 
@@ -43,7 +46,6 @@ const submitRequest = async (req, res) => {
   }
 
   try {
-    // Convert script buffer to string if script is provided
     const scriptContent = hasScript ? scriptFile.buffer.toString('utf8') : null;
     
     const createdRequest = await requestService.createRequest({
@@ -82,34 +84,14 @@ const getMyRequests = async (req, res) => {
   }
 
   try {
-    // Extract query parameters
-    const {
-      status,
-      sortBy,
-      limit,
-      offset
-    } = req.query;
-
-    // Validate limit and offset if provided
-    if (limit !== undefined && parseInt(limit) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Limit cannot be negative"
-      });
-    }
-
-    if (offset !== undefined && parseInt(offset) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Offset cannot be negative"
-      });
-    }
+    // Query params validated by Zod middleware
+    const { status, sortBy, limit, offset } = req.query;
 
     const rows = await requestService.getUserRequests(userId, {
       status,
       sortBy,
-      limit: limit ? parseInt(limit) : null,
-      offset: offset ? parseInt(offset) : null
+      limit,
+      offset
     });
 
     const requests = rows.map(row => ({

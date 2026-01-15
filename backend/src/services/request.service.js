@@ -1,10 +1,6 @@
 const { query } = require("../config/db");
 
 /**
- * Request Service - Handles all database operations for request workflow
- */
-
-/**
  * Submit a new query or script request
  * @param {Object} requestData - Request submission data
  * @param {number} requestData.userId - User ID of the requester

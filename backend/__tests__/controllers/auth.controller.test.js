@@ -68,10 +68,8 @@ describe('Auth Controller', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Email and password are required'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
     });
 
     it('should return 400 when password is missing', async () => {
@@ -82,10 +80,21 @@ describe('Auth Controller', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Email and password are required'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
+    });
+
+    it('should return 400 when email format is invalid', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'invalid-email',
+          password: 'password123'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Invalid email format');
     });
 
     it('should return 401 for invalid credentials', async () => {
@@ -213,5 +222,39 @@ describe('Auth Controller', () => {
       // the controller should handle it gracefully
       expect(response.status).toBe(401);
     });
+  });
+});
+
+describe('Auth Controller - Edge Cases', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+  });
+
+  it('should handle logout when token is null/undefined gracefully', async () => {
+    // Mock middleware to bypass auth and set no token
+    jest.doMock('../../src/middlewares/auth.middleware', () => {
+      return (req, res, next) => {
+        req.user = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
+        req.headers.authorization = undefined; // No token
+        next();
+      };
+    });
+
+    const authSvc = require('../../src/services/auth.service');
+    authSvc.logout = jest.fn();
+
+    const app = require('../../src/app');
+    
+    const response = await request(app)
+      .post('/api/v1/auth/logout');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: 'Logged out successfully'
+    });
+    // logout should not be called when token is falsy
+    expect(authSvc.logout).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,8 @@ const router = express.Router();
 const requestController = require("../controllers/request.controller");
 const approvalController = require("../controllers/approval.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const { paginationSchema, reqIdParamSchema } = require("../validators/schemas");
 const multer = require('multer');
 const path = require('path');
 
@@ -22,9 +24,9 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage: storage, // Store in memory, not on disk
+  storage: storage,
   limits: {
-    fileSize: 16 * 1024 * 1024, // 16MB limit
+    fileSize: 16 * 1024 * 1024,
     files: 1
   },
   fileFilter: fileFilter
@@ -35,97 +37,24 @@ const smartUploadMiddleware = (req, res, next) => {
   const uploadSingle = upload.single('script');
   
   uploadSingle(req, res, function (err) {
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({
-          success: false,
-          message: 'File too large. Maximum size is 5MB.'
-        });
-      } else if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({
-          success: false,
-          message: 'Too many files. Only one file allowed.'
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: `Upload error: ${err.message}`
-        });
-      }
-    } else if (err) {
-      return res.status(400).json({
-        success: false,
-        message: err.message
-      });
-    }
+    if (!err) return next();
     
-    // File upload succeeded or no file was provided - both are OK
-    next();
+    // Multer error handling with lookup map
+    const multerErrors = {
+      'LIMIT_FILE_SIZE': 'File too large. Maximum size is 16MB.',
+      'LIMIT_FILE_COUNT': 'Too many files. Only one file allowed.'
+    };
+    
+    const message = err instanceof multer.MulterError
+      ? multerErrors[err.code] || `Upload error: ${err.message}`
+      : err.message;
+    
+    return res.status(400).json({ success: false, message });
   });
 };
 
-router.post(
-  "/",
-  authMiddleware,
-  smartUploadMiddleware,
-  requestController.submitRequest
-);
-
-router.get(
-  "/mine",
-  authMiddleware,
-  requestController.getMyRequests
-);
-
-router.get(
-  "/:req_id/result",
-  authMiddleware,
-  approvalController.getExecutionResult
-);
+router.post("/",authMiddleware,smartUploadMiddleware,requestController.submitRequest);
+router.get("/mine",authMiddleware,validate({ query: paginationSchema }),requestController.getMyRequests);
+router.get("/:req_id/result",authMiddleware,validate({ params: reqIdParamSchema }),approvalController.getExecutionResult);
 
 module.exports = router;
-
-/**
- * @swagger
- * /request:
- *   post:
- *     summary: Submit query or script request
- *     tags:
- *       - Requests
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - instance_id
- *               - db_name
- *               - comments
- *               - pod_id
- *             properties:
- *               instance_id:
- *                 type: integer
- *                 example: 1
- *               db_name:
- *                 type: string
- *               query:
- *                 type: string
- *                 example: SELECT * FROM users;
- *               script:
- *                 type: string
- *                 format: binary
- *               comments:
- *                 type: string
- *               pod_id:
- *                 type: string
- *     responses:
- *       201:
- *         description: Request submitted
- */
-router.post(
-  "/",
-  authMiddleware,
-  upload.single("script"),
-  requestController.submitRequest
-);

@@ -5,114 +5,133 @@ const mongoScriptExecutionService = require('./mongoScript.service');
 const { query } = require('../config/db');
 
 class ExecutionService {
-  // Generic execution method that routes to appropriate engine and type
   async executeQuery(requestId) {
     try {
-      // Get request details to determine database engine and request type
-      const requestResult = await query(
-        `SELECT di.engine, qr.query_text, qr.script_path 
-         FROM query_requests qr 
-         JOIN db_instances di ON qr.db_instance_id = di.id 
-         WHERE qr.id = $1`,
+      const result = await query(
+        `
+        SELECT di.engine, qr.query_text, qr.script_path
+        FROM query_requests qr
+        JOIN db_instances di ON qr.db_instance_id = di.id
+        WHERE qr.id = $1
+        `,
         [requestId]
       );
 
-      if (requestResult.rows.length === 0) {
+      if (result.rows.length === 0) {
         throw new Error(`Request ${requestId} not found`);
       }
 
-      const { engine, query_text, script_path } = requestResult.rows[0];
+      const { engine, query_text, script_path } = result.rows[0];
 
-      // Route based on request type and engine using strategy pattern
-      const scriptExecutors = {
-        POSTGRES: () => postgresScriptExecutionService.executePostgresScript(requestId),
-        MONGO: () => mongoScriptExecutionService.executeMongoScript(requestId)
-      };
-
-      const queryExecutors = {
-        POSTGRES: () => postgresExecutionService.executePostgresQuery(requestId),
-        MONGO: () => mongoExecutionService.executeMongoQuery(requestId)
-      };
-
-      // Execute based on request type
-      const hasScript = Boolean(script_path);
       const hasQuery = Boolean(query_text);
-      
-      const executor = hasScript 
-        ? scriptExecutors[engine] 
-        : hasQuery 
-          ? queryExecutors[engine] 
-          : null;
+      const hasScript = Boolean(script_path);
+
+      if (!hasQuery && !hasScript) {
+        throw new Error('Request has neither query text nor script path');
+      }
+
+      const executors = {
+        QUERY: {
+          POSTGRES: () =>
+            postgresExecutionService.executePostgresQuery(requestId),
+          MONGO: () =>
+            mongoExecutionService.executeMongoQuery(requestId)
+        },
+        SCRIPT: {
+          POSTGRES: () =>
+            postgresScriptExecutionService.executePostgresScript(requestId),
+          MONGO: () =>
+            mongoScriptExecutionService.executeMongoScript(requestId)
+        }
+      };
+
+      const type = hasScript ? 'SCRIPT' : 'QUERY';
+      const executor = executors[type]?.[engine];
 
       if (!executor) {
-        const errorMessage = hasScript || hasQuery
-          ? `${hasScript ? 'Script' : 'Query'} execution not supported for engine: ${engine}`
-          : 'Request has neither query text nor script path';
-        throw new Error(errorMessage);
+        throw new Error(
+          `${type} execution not supported for engine: ${engine}`
+        );
       }
 
       return await executor();
     } catch (error) {
-      console.error(`Generic execution failed for request ${requestId}:`, error.message);
+      console.error(
+        `Execution failed for request ${requestId}:`,
+        error.message
+      );
       throw error;
     }
   }
 
-  // PostgreSQL-specific execution (delegated)
   async executePostgresQuery(requestId) {
-    return await postgresExecutionService.executePostgresQuery(requestId);
+    return postgresExecutionService.executePostgresQuery(requestId);
   }
-
-  // MongoDB-specific execution (delegated)
   async executeMongoQuery(requestId) {
-    return await mongoExecutionService.executeMongoQuery(requestId);
+    return mongoExecutionService.executeMongoQuery(requestId);
+  }
+  async executePostgresScript(requestId) {
+    return postgresScriptExecutionService.executePostgresScript(requestId);
+  }
+  async executeMongoScript(requestId) {
+    return mongoScriptExecutionService.executeMongoScript(requestId);
   }
 
-  // Script execution (delegated to PostgreSQL script service)
-  async executeScript(requestId) {
-    return await postgresScriptExecutionService.executePostgresScript(requestId);
-  }
-
-  // Get execution result for a request (works for both queries and scripts)
   async getExecutionResult(requestId) {
     try {
-      // Check if it's a script request and get engine type
-      const requestCheck = await query(
-        `SELECT qr.script_path, di.engine 
-         FROM query_requests qr 
-         JOIN db_instances di ON qr.db_instance_id = di.id 
-         WHERE qr.id = $1`,
+      const result = await query(
+        `
+        SELECT di.engine, qr.query_text, qr.script_path
+        FROM query_requests qr
+        JOIN db_instances di ON qr.db_instance_id = di.id
+        WHERE qr.id = $1
+        `,
         [requestId]
       );
-      
-      const hasScriptRequest = requestCheck.rows.length > 0 && requestCheck.rows[0].script_path;
-      
-      const resultServices = {
-        script: {
-          MONGO: () => mongoScriptExecutionService.getScriptExecutionResult(requestId),
-          default: () => postgresScriptExecutionService.getScriptExecutionResult(requestId)
+
+      if (result.rows.length === 0) {
+        throw new Error(`Request ${requestId} not found`);
+      }
+
+      const { engine, query_text, script_path } = result.rows[0];
+      const hasScript = Boolean(script_path);
+
+      const resultFetchers = {
+        QUERY: {
+          POSTGRES: () =>
+            postgresExecutionService.getExecutionResult(requestId),
+          MONGO: () =>
+            mongoExecutionService.getExecutionResult(requestId)
         },
-        query: () => postgresExecutionService.getExecutionResult(requestId)
+        SCRIPT: {
+          POSTGRES: () =>
+            postgresScriptExecutionService.getScriptExecutionResult(requestId),
+          MONGO: () =>
+            mongoScriptExecutionService.getScriptExecutionResult(requestId)
+        }
       };
 
-      const serviceType = hasScriptRequest ? 'script' : 'query';
-      const engine = hasScriptRequest ? requestCheck.rows[0].engine : null;
-      
-      const service = hasScriptRequest 
-        ? (resultServices.script[engine] || resultServices.script.default)
-        : resultServices.query;
+      const type = hasScript ? 'SCRIPT' : 'QUERY';
+      const fetcher = resultFetchers[type]?.[engine];
 
-      return await service();
+      if (!fetcher) {
+        throw new Error(
+          `Result fetch not supported for ${type} on engine ${engine}`
+        );
+      }
+
+      return await fetcher();
     } catch (error) {
-      console.error(`Failed to get execution result for request ${requestId}:`, error.message);
+      console.error(
+        `Failed to get execution result for request ${requestId}:`,
+        error.message
+      );
       throw error;
     }
   }
 
-  // Execute multiple queries (mixed engines supported)
   async executeMultipleQueries(requestIds) {
     const results = [];
-    
     for (const requestId of requestIds) {
       try {
         const result = await this.executeQuery(requestId);
@@ -125,47 +144,73 @@ class ExecutionService {
         });
       }
     }
-    
+
     return results;
   }
 
-  // Batch execute by engine type
+
   async executePostgresBatch(requestIds) {
-    return await postgresExecutionService.executeMultipleQueries(requestIds);
+    return postgresExecutionService.executeMultipleQueries(requestIds);
   }
 
   async executeMongoBatch(requestIds) {
-    return await mongoExecutionService.executeMultipleQueries(requestIds);
+    return mongoExecutionService.executeMultipleQueries(requestIds);
   }
 
-  // Batch execute scripts
-  async executeScriptBatch(requestIds) {
-    const results = [];
-    
-    for (const requestId of requestIds) {
-      try {
-        const result = await postgresScriptExecutionService.executePostgresScript(requestId);
-        results.push(result);
-      } catch (error) {
-        results.push({
-          requestId,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-    
-    return results;
-  }
-
-  // Update request status (shared utility)
+  // Update request status in database
   async updateRequestStatus(requestId, status) {
-    return await postgresExecutionService.updateRequestStatus(requestId, status);
+    try {
+      await query(
+        'UPDATE query_requests SET status = $1 WHERE id = $2',
+        [status, requestId]
+      );
+      console.log(`Updated request ${requestId} status to ${status}`);
+    } catch (error) {
+      console.error(`Failed to update request ${requestId} status:`, error.message);
+      throw error;
+    }
   }
 
-  // Log execution (shared utility)
+  // Log execution result to execution_logs table
   async logExecution(requestId, executionResult) {
-    return await postgresExecutionService.logExecution(requestId, executionResult);
+    try {
+      const logResult = await query(
+        `INSERT INTO execution_logs 
+         (request_id, success, output, error, execution_time_ms) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id`,
+        [
+          requestId,
+          executionResult.success,
+          this.formatOutput(executionResult),
+          executionResult.error || null,
+          executionResult.executionTime || 0
+        ]
+      );
+      
+      console.log(`Logged execution result for request ${requestId}, log ID: ${logResult.rows[0].id}`);
+    } catch (error) {
+      console.error(`Failed to log execution for request ${requestId}:`, error.message);
+    }
+  }
+
+  formatOutput(executionResult) {
+    if (!executionResult.success) {
+      return null;
+    }
+
+    if (!executionResult.rows || executionResult.rows.length === 0) {
+      return 'Query executed successfully. No rows returned.';
+    }
+
+    if (executionResult.rows.length > 100) {
+      return `Query executed successfully. ${executionResult.rowCount} rows returned. (First 100 rows shown)\n\n` +
+             JSON.stringify(executionResult.rows.slice(0, 100), null, 2) +
+             `\n\n... and ${executionResult.rowCount - 100} more rows`;
+    }
+
+    return `Query executed successfully. ${executionResult.rowCount} rows returned.\n\n` +
+           JSON.stringify(executionResult.rows, null, 2);
   }
 }
 

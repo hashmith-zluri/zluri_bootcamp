@@ -205,49 +205,47 @@ const parseMongoQuery = (queryText) => {
     
     const [, collection, operation, paramsStr] = match;
     
-    // Parse parameters
+    // Parse parameters using operation-specific handlers
+    const paramParsers = {
+      aggregate: (str) => ({ pipeline: JSON.parse(str) }),
+      count: (str) => ({ filter: str.trim() ? JSON.parse(str) : {} }),
+      countDocuments: (str) => ({ filter: str.trim() ? JSON.parse(str) : {} }),
+      insertOne: (str) => ({ document: JSON.parse(str) }),
+      insertMany: (str) => ({ documents: JSON.parse(str) }),
+      updateOne: (str) => {
+        const [filter, update] = parseShellParams(str);
+        return { filter: filter || {}, update: update || {} };
+      },
+      updateMany: (str) => {
+        const [filter, update] = parseShellParams(str);
+        return { filter: filter || {}, update: update || {} };
+      },
+      deleteOne: (str) => ({ filter: JSON.parse(str) }),
+      deleteMany: (str) => ({ filter: JSON.parse(str) }),
+      replaceOne: (str) => {
+        const [filter, replacement] = parseShellParams(str);
+        return { filter: filter || {}, replacement: replacement || {} };
+      },
+      distinct: (str) => {
+        const [field, filter] = parseShellParams(str);
+        return { field, filter: filter || {} };
+      },
+      drop: () => ({}),
+      // Default handler for find/findOne
+      default: (str) => {
+        const [filter, projection] = parseShellParams(str);
+        const params = {};
+        if (filter) params.filter = filter;
+        if (projection) params.projection = projection;
+        return params;
+      }
+    };
+    
     let params = {};
     if (paramsStr.trim()) {
       try {
-        // Handle different parameter formats
-        if (operation === 'aggregate') {
-          // For aggregate, expect array parameter
-          params.pipeline = JSON.parse(paramsStr);
-        } else if (operation === 'count' || operation === 'countDocuments') {
-          // For count, parameter is filter
-          params.filter = paramsStr.trim() ? JSON.parse(paramsStr) : {};
-        } else if (operation === 'insertOne') {
-          // For insertOne, parameter is document
-          params.document = JSON.parse(paramsStr);
-        } else if (operation === 'insertMany') {
-          // For insertMany, parameter is array of documents
-          params.documents = JSON.parse(paramsStr);
-        } else if (operation === 'updateOne' || operation === 'updateMany') {
-          // For update operations, first param is filter, second is update
-          const paramArray = parseShellParams(paramsStr);
-          params.filter = paramArray[0] || {};
-          params.update = paramArray[1] || {};
-        } else if (operation === 'deleteOne' || operation === 'deleteMany') {
-          // For delete operations, parameter is filter
-          params.filter = JSON.parse(paramsStr);
-        } else if (operation === 'replaceOne') {
-          // For replaceOne, first param is filter, second is replacement
-          const paramArray = parseShellParams(paramsStr);
-          params.filter = paramArray[0] || {};
-          params.replacement = paramArray[1] || {};
-        } else if (operation === 'distinct') {
-          // For distinct, first param is field, second is filter
-          const paramArray = parseShellParams(paramsStr);
-          params.field = paramArray[0];
-          params.filter = paramArray[1] || {};
-        } else if (operation === 'drop') {
-          // drop takes no parameters
-        } else {
-          // For find/findOne and others, parse parameters
-          const paramArray = parseShellParams(paramsStr);
-          if (paramArray.length > 0) params.filter = paramArray[0];
-          if (paramArray.length > 1) params.projection = paramArray[1];
-        }
+        const parser = paramParsers[operation] || paramParsers.default;
+        params = parser(paramsStr);
       } catch (parseError) {
         throw new Error(`Invalid parameters: ${parseError.message}`);
       }
@@ -265,7 +263,7 @@ const parseMongoQuery = (queryText) => {
 };
 
 // Helper function to parse shell parameters
-//Istanbul ignore next/
+
 const parseShellParams = (paramsStr) => {
   if (!paramsStr.trim()) return [];
   

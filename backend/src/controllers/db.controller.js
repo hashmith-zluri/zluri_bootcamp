@@ -7,12 +7,7 @@ const dbController = {
 
   getDbInstances: async (req, res) => {
     const { type } = req.query;
-    if (!type) {
-      return res.status(400).json({
-        success: false,
-        message: "Type parameter is required",
-      });
-    }
+    // Type is already validated by Zod middleware
     try {
       const instances = await dbService.getInstancesByType(type);
       res.status(200).json({

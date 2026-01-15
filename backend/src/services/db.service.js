@@ -1,9 +1,4 @@
 const { query } = require("../config/db");
-
-/**
- * Database Service - Handles all database operations for database management
- */
-
 /**
  * Get database instances by engine type
  * @param {string} engineType - Database engine type (POSTGRES or MONGO)

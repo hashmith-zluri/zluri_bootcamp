@@ -23,34 +23,14 @@ const getApprovalRequests = async (req, res) => {
   }
 
   try {
-    // Extract query parameters
-    const {
-      status,
-      sortBy,
-      limit,
-      offset
-    } = req.query;
-
-    // Validate limit and offset if provided
-    if (limit !== undefined && parseInt(limit) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Limit cannot be negative"
-      });
-    }
-
-    if (offset !== undefined && parseInt(offset) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Offset cannot be negative"
-      });
-    }
+    // Query params validated by Zod middleware
+    const { status, sortBy, limit, offset } = req.query;
 
     const rows = await approvalService.getApprovalRequestsByPods(managedPods, {
       status,
       sortBy,
-      limit: limit ? parseInt(limit) : null,
-      offset: offset ? parseInt(offset) : null
+      limit,
+      offset
     });
 
     const requests = rows.map(row => ({
@@ -106,7 +86,6 @@ const approveOrReject = async (req, res) => {
       });
     }
 
-    // Get manager's managed PODs
     const managedPods = pods
       .filter(pod => pod.manager_email === managerEmail)
       .map(pod => pod.id);
@@ -118,15 +97,7 @@ const approveOrReject = async (req, res) => {
       });
     }
   
-    if (!["approve", "reject"].includes(action)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid action"
-      });
-    }
-  
     try {
-      // Verify manager owns the POD for this request
       const request = await approvalService.getRequestById(req_id);
 
       if (!request) {
@@ -136,7 +107,6 @@ const approveOrReject = async (req, res) => {
         });
       }
 
-      // Check if request is already processed
       if (request.status !== 'PENDING') {
         return res.status(400).json({
           success: false,
@@ -153,7 +123,6 @@ const approveOrReject = async (req, res) => {
       }
 
       if (action === "approve") {
-        // Update request status to APPROVED
         const approvedRequest = await approvalService.approveRequest(req_id, approverId);
 
         if (!approvedRequest) {
@@ -163,11 +132,8 @@ const approveOrReject = async (req, res) => {
           });
         }
         
-        // Trigger execution for approved requests
         if (approvedRequest.query_text) {
           console.log(`Triggering query execution for approved request ${req_id}`);
-          
-          // Execute query asynchronously (don't wait for completion)
           executionService.executeQuery(req_id)
             .then(result => /*istanbul ignore next*/{
               console.log(`Query execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
@@ -177,8 +143,6 @@ const approveOrReject = async (req, res) => {
             });
         } else if (approvedRequest.script_path) {
           console.log(`Triggering script execution for approved request ${req_id}`);
-          
-          // Execute script asynchronously - executionService handles routing to correct engine
           executionService.executeQuery(req_id)
             .then(result => /*istanbul ignore next*/{
               console.log(`Script execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
@@ -190,11 +154,10 @@ const approveOrReject = async (req, res) => {
 
         return res.status(200).json({ success: true, status: "approved" });
       }
+
       if (action === "reject") {
-        // Update request status to REJECTED and store rejection reason
         const rejectedRequest = await approvalService.rejectRequest(req_id, approverId, reason);
         
-        //istanbul ignore next/
         if (!rejectedRequest) {
           return res.status(404).json({
             success: false,
@@ -202,7 +165,6 @@ const approveOrReject = async (req, res) => {
           });
         }
 
-        // Log the rejection for audit purposes
         await approvalService.logRejection(req_id, reason);
   
         return res.status(200).json({
@@ -226,7 +188,6 @@ const getExecutionResult = async (req, res) => {
   const userId = req.user?.id;
 
   try {
-    // Verify user owns this request or is a manager/admin
     const request = await approvalService.getRequestOwnership(req_id);
 
     if (!request) {
@@ -237,7 +198,6 @@ const getExecutionResult = async (req, res) => {
     }
     const userRole = req.user?.role;
 
-    // Check access permissions
     if (request.requester_id !== userId && !['MANAGER', 'ADMIN'].includes(userRole)) {
       return res.status(403).json({
         success: false,
@@ -245,7 +205,6 @@ const getExecutionResult = async (req, res) => {
       });
     }
 
-    // Get execution result
     const result = await executionService.getExecutionResult(req_id);
     return res.status(200).json({ success: true, ...result });
 
@@ -263,4 +222,3 @@ module.exports = {
   approveOrReject,
   getExecutionResult
 };
-  

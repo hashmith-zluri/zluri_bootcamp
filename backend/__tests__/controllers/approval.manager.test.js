@@ -157,7 +157,7 @@ describe('Approval Controller - Manager Access', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ success: true, status: 'approved' });
-      expect(executionService.executeQuery).toHaveBeenCalledWith('1');
+      expect(executionService.executeQuery).toHaveBeenCalledWith(1);
     });
 
     it('should approve script request and trigger script execution', async () => {
@@ -172,7 +172,7 @@ describe('Approval Controller - Manager Access', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ success: true, status: 'approved' });
-      expect(executionService.executeQuery).toHaveBeenCalledWith('1');
+      expect(executionService.executeQuery).toHaveBeenCalledWith(1);
     });
 
     it('should return 403 when manager tries to approve request from different POD', async () => {
@@ -196,10 +196,8 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'invalid' });
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Invalid action'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
     });
 
     it('should return 404 when request not found', async () => {

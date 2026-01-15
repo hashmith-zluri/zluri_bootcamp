@@ -1,10 +1,6 @@
 const { query } = require("../config/db");
 
 /**
- * Approval Service - Handles all database operations for approval workflow
- */
-
-/**
  * Get approval requests for specific PODs with pagination, sorting, and filtering
  * @param {string[]} managedPods - Array of POD IDs that the manager manages
  * @param {Object} options - Query options

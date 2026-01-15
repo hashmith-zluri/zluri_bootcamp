@@ -51,11 +51,32 @@ describe('Approval Controller - User Access', () => {
 
   describe('GET /api/v1/request/:reqid/result', () => {
     it('should return execution result for own request', async () => {
-      const mockRequestResult = {
+      // First query: getRequestOwnership
+      const mockOwnershipResult = {
         rows: [{ requester_id: 1 }] // User's own request
       };
       
-      query.mockResolvedValue(mockRequestResult);
+      // Second query: get engine info for execution result
+      const mockEngineResult = {
+        rows: [{ engine: 'POSTGRES', query_text: 'SELECT 1', script_path: null }]
+      };
+      
+      // Third query: get execution result
+      const mockExecutionResult = {
+        rows: [{
+          success: true,
+          output: 'Query result',
+          error: null,
+          execution_time_ms: 100,
+          executed_at: '2024-01-01T00:00:00Z',
+          status: 'EXECUTED'
+        }]
+      };
+      
+      query
+        .mockResolvedValueOnce(mockOwnershipResult)
+        .mockResolvedValueOnce(mockEngineResult)
+        .mockResolvedValueOnce(mockExecutionResult);
 
       const response = await request(app)
         .get('/api/v1/request/1/result');

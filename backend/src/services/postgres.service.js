@@ -94,8 +94,7 @@ class PostgresExecutionService {
     }
   }
 
-  // Update request status in database
-  async updateRequestStatus(requestId, status) {
+    async updateRequestStatus(requestId, status) {
     try {
       await query(
         'UPDATE query_requests SET status = $1 WHERE id = $2',

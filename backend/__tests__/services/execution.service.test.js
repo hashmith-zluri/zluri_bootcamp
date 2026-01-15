@@ -107,7 +107,7 @@ describe('Execution Service', () => {
         rows: [{ engine: 'MYSQL', query_text: 'SELECT 1', script_path: null }]
       });
 
-      await expect(executionService.executeQuery(5)).rejects.toThrow('Query execution not supported for engine');
+      await expect(executionService.executeQuery(5)).rejects.toThrow('QUERY execution not supported for engine: MYSQL');
     });
 
     it('should throw error for unsupported engine with script', async () => {
@@ -115,7 +115,7 @@ describe('Execution Service', () => {
         rows: [{ engine: 'MYSQL', query_text: null, script_path: 'console.log("test")' }]
       });
 
-      await expect(executionService.executeQuery(5)).rejects.toThrow('Script execution not supported');
+      await expect(executionService.executeQuery(5)).rejects.toThrow('SCRIPT execution not supported for engine: MYSQL');
     });
 
     it('should throw error when request not found', async () => {
@@ -161,16 +161,30 @@ describe('Execution Service', () => {
     });
   });
 
-  describe('executeScript', () => {
+  describe('executePostgresScript', () => {
     it('should delegate to postgres script service', async () => {
       postgresScriptService.executePostgresScript.mockResolvedValue({
         success: true,
         requestId: 1
       });
 
-      const result = await executionService.executeScript(1);
+      const result = await executionService.executePostgresScript(1);
 
       expect(postgresScriptService.executePostgresScript).toHaveBeenCalledWith(1);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('executeMongoScript', () => {
+    it('should delegate to mongo script service', async () => {
+      mongoScriptService.executeMongoScript.mockResolvedValue({
+        success: true,
+        requestId: 1
+      });
+
+      const result = await executionService.executeMongoScript(1);
+
+      expect(mongoScriptService.executeMongoScript).toHaveBeenCalledWith(1);
       expect(result.success).toBe(true);
     });
   });
@@ -289,50 +303,113 @@ describe('Execution Service', () => {
     });
   });
 
-  describe('executeScriptBatch', () => {
-    it('should execute multiple scripts', async () => {
-      postgresScriptService.executePostgresScript
-        .mockResolvedValueOnce({ success: true, requestId: 1 })
-        .mockResolvedValueOnce({ success: true, requestId: 2 });
 
-      const results = await executionService.executeScriptBatch([1, 2]);
-
-      expect(results).toHaveLength(2);
-      expect(results[0].success).toBe(true);
-      expect(results[1].success).toBe(true);
-    });
-
-    it('should handle errors in script batch', async () => {
-      postgresScriptService.executePostgresScript
-        .mockResolvedValueOnce({ success: true, requestId: 1 })
-        .mockRejectedValueOnce(new Error('Script error'));
-
-      const results = await executionService.executeScriptBatch([1, 2]);
-
-      expect(results).toHaveLength(2);
-      expect(results[0].success).toBe(true);
-      expect(results[1].success).toBe(false);
-      expect(results[1].error).toBe('Script error');
-    });
-  });
 
   describe('updateRequestStatus', () => {
-    it('should delegate to postgres service', async () => {
-      postgresExecutionService.updateRequestStatus.mockResolvedValue(undefined);
+    it('should update request status in database', async () => {
+      query.mockResolvedValue({ rows: [] });
 
       await executionService.updateRequestStatus(1, 'EXECUTING');
 
-      expect(postgresExecutionService.updateRequestStatus).toHaveBeenCalledWith(1, 'EXECUTING');
+      expect(query).toHaveBeenCalledWith(
+        'UPDATE query_requests SET status = $1 WHERE id = $2',
+        ['EXECUTING', 1]
+      );
+    });
+
+    it('should throw error on database failure', async () => {
+      query.mockRejectedValue(new Error('Database error'));
+
+      await expect(executionService.updateRequestStatus(1, 'EXECUTING')).rejects.toThrow('Database error');
     });
   });
 
   describe('logExecution', () => {
-    it('should delegate to postgres service', async () => {
-      postgresExecutionService.logExecution.mockResolvedValue(undefined);
+    it('should log execution result to database', async () => {
+      query.mockResolvedValue({ rows: [{ id: 1 }] });
 
+      await executionService.logExecution(1, { success: true, executionTime: 100 });
+
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO execution_logs'),
+        expect.arrayContaining([1, true])
+      );
+    });
+
+    it('should handle logging errors gracefully', async () => {
+      query.mockRejectedValue(new Error('Log error'));
+
+      // Should not throw, just log error
       await executionService.logExecution(1, { success: true });
+    });
+  });
 
-      expect(postgresExecutionService.logExecution).toHaveBeenCalledWith(1, { success: true });
+  describe('getExecutionResult - additional cases', () => {
+    it('should get result for MongoDB query', async () => {
+      query.mockResolvedValue({
+        rows: [{ script_path: null, engine: 'MONGO' }]
+      });
+      mongoExecutionService.getExecutionResult.mockResolvedValue({
+        status: 'success',
+        output: 'Mongo query result'
+      });
+
+      const result = await executionService.getExecutionResult(1);
+
+      expect(mongoExecutionService.getExecutionResult).toHaveBeenCalledWith(1);
+      expect(result.status).toBe('success');
+    });
+
+    it('should throw error for unsupported engine result fetch', async () => {
+      query.mockResolvedValue({
+        rows: [{ script_path: null, engine: 'MYSQL' }]
+      });
+
+      await expect(executionService.getExecutionResult(1)).rejects.toThrow('Result fetch not supported for QUERY on engine MYSQL');
+    });
+
+    it('should throw error when request not found for result fetch', async () => {
+      query.mockResolvedValue({ rows: [] });
+
+      await expect(executionService.getExecutionResult(999)).rejects.toThrow('Request 999 not found');
+    });
+  });
+
+  describe('formatOutput', () => {
+    it('should return null for failed execution', () => {
+      const result = executionService.formatOutput({ success: false });
+      expect(result).toBeNull();
+    });
+
+    it('should return message for empty rows', () => {
+      const result = executionService.formatOutput({ success: true, rows: [] });
+      expect(result).toBe('Query executed successfully. No rows returned.');
+    });
+
+    it('should return message when rows is undefined', () => {
+      const result = executionService.formatOutput({ success: true });
+      expect(result).toBe('Query executed successfully. No rows returned.');
+    });
+
+    it('should format small result sets', () => {
+      const result = executionService.formatOutput({
+        success: true,
+        rows: [{ id: 1 }, { id: 2 }],
+        rowCount: 2
+      });
+      expect(result).toContain('Query executed successfully. 2 rows returned.');
+      expect(result).toContain('"id": 1');
+    });
+
+    it('should truncate large result sets over 100 rows', () => {
+      const rows = Array.from({ length: 150 }, (_, i) => ({ id: i + 1 }));
+      const result = executionService.formatOutput({
+        success: true,
+        rows,
+        rowCount: 150
+      });
+      expect(result).toContain('150 rows returned. (First 100 rows shown)');
+      expect(result).toContain('... and 50 more rows');
     });
   });
 });

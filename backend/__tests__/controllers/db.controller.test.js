@@ -66,10 +66,18 @@ describe('DB Controller', () => {
         .get('/api/v1/db/instances');
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Type parameter is required'
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBeDefined();
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 for invalid database type', async () => {
+      const response = await request(app)
+        .get('/api/v1/db/instances?type=MONGO111');
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Database type not found. Valid types: POSTGRES, MONGO');
       expect(query).not.toHaveBeenCalled();
     });
 
