@@ -243,11 +243,13 @@ describe('PostgreSQL Service', () => {
         rowCount: 1
       });
 
-      expect(result).toContain('1 rows returned');
-      expect(result).toContain('Test');
+      const parsed = JSON.parse(result);
+      expect(parsed.console_output).toContain('1 rows returned');
+      expect(parsed.result_data).toHaveLength(1);
+      expect(parsed.result_data[0].name).toBe('Test');
     });
 
-    it('should truncate large result sets', () => {
+    it('should not truncate result sets anymore', () => {
       const largeResult = Array(150).fill({ id: 1 });
       const result = postgresService.formatOutput({
         success: true,
@@ -255,9 +257,9 @@ describe('PostgreSQL Service', () => {
         rowCount: 150
       });
 
-      expect(result).toContain('150 rows returned');
-      expect(result).toContain('First 100 rows shown');
-      expect(result).toContain('50 more rows');
+      const parsed = JSON.parse(result);
+      expect(parsed.console_output).toContain('150 rows returned');
+      expect(parsed.result_data).toHaveLength(150);
     });
   });
 

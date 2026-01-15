@@ -1,3 +1,5 @@
+npm test -- --coverage && open coverage/index.html
+
 1. script example given in the reference implementation and mine are different as shown below 
 
 my implementation:::
@@ -320,6 +322,3 @@ answer:
 - Connection released back to pool (if acquired)
 - User sees error in execution result
 
-“We execute JavaScript scripts inside isolated worker threads with 
-restricted globals, execution timeouts, and controlled database access. 
-This provides a sandboxed runtime environment at the Node.js level.”

@@ -135,20 +135,15 @@ class PostgresExecutionService {
       return null;
     }
 
-    if (!executionResult.rows || executionResult.rows.length === 0) {
-      return 'Query executed successfully. No rows returned.';
-    }
+    // Return structured output as JSON (consistent with script output)
+    const result = {
+      console_output: executionResult.rows && executionResult.rows.length > 0
+        ? `Query executed successfully. ${executionResult.rowCount} rows returned.`
+        : 'Query executed successfully. No rows returned.',
+      result_data: executionResult.rows || []
+    };
 
-    // For large result sets, truncate and show summary
-    if (executionResult.rows.length > 100) {
-      return `Query executed successfully. ${executionResult.rowCount} rows returned. (First 100 rows shown)\n\n` +
-             JSON.stringify(executionResult.rows.slice(0, 100), null, 2) +
-             `\n\n... and ${executionResult.rowCount - 100} more rows`;
-    }
-
-    // For reasonable result sets, show all data
-    return `Query executed successfully. ${executionResult.rowCount} rows returned.\n\n` +
-           JSON.stringify(executionResult.rows, null, 2);
+    return JSON.stringify(result, null, 2);
   }
 
   // Get execution result for a request

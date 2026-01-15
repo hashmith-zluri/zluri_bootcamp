@@ -139,20 +139,15 @@ class MongoExecutionService {
       return null;
     }
 
-    if (!executionResult.rows || executionResult.rows.length === 0) {
-      return `MongoDB ${executionResult.operation} executed successfully. No documents returned.`;
-    }
+    // Return structured output as JSON (consistent with script output)
+    const result = {
+      console_output: executionResult.rows && executionResult.rows.length > 0
+        ? `MongoDB ${executionResult.operation} executed successfully on collection '${executionResult.collection}'. ${executionResult.rowCount} documents returned.`
+        : `MongoDB ${executionResult.operation} executed successfully. No documents returned.`,
+      result_data: executionResult.rows || []
+    };
 
-    // For large result sets, truncate and show summary
-    if (executionResult.rows.length > 100) {
-      return `MongoDB ${executionResult.operation} executed successfully on collection '${executionResult.collection}'. ${executionResult.rowCount} documents returned. (First 100 documents shown)\n\n` +
-             JSON.stringify(executionResult.rows.slice(0, 100), null, 2) +
-             `\n\n... and ${executionResult.rowCount - 100} more documents`;
-    }
-
-    // For reasonable result sets, show all data
-    return `MongoDB ${executionResult.operation} executed successfully on collection '${executionResult.collection}'. ${executionResult.rowCount} documents returned.\n\n` +
-           JSON.stringify(executionResult.rows, null, 2);
+    return JSON.stringify(result, null, 2);
   }
 
   // Get execution result for a request

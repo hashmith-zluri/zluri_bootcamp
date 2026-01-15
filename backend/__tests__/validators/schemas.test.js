@@ -109,10 +109,23 @@ describe('Zod Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should validate approve action with null reason', () => {
+      const result = approvalActionSchema.safeParse({ action: 'approve', reason: null });
+      expect(result.success).toBe(true);
+    });
+
     it('should validate reject action with reason', () => {
       const result = approvalActionSchema.safeParse({
         action: 'reject',
         reason: 'Security concerns'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate reject action with null reason', () => {
+      const result = approvalActionSchema.safeParse({
+        action: 'reject',
+        reason: null
       });
       expect(result.success).toBe(true);
     });

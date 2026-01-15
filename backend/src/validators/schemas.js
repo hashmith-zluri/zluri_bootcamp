@@ -20,7 +20,7 @@ const approvalActionSchema = z.object({
   action: z.enum(['approve', 'reject'], {
     message: 'Invalid action. Must be "approve" or "reject"'
   }),
-  reason: z.string().optional()
+  reason: z.string().optional().nullable()
 });
 
 // Query params schemas

@@ -313,15 +313,13 @@ describe('MongoDB Script Service', () => {
     it('should return formatted JSON for successful execution', () => {
       const executionResult = {
         success: true,
-        output: 'mongo test output',
-        metadata: { database: 'test_mongo', host: 'localhost' }
+        output: 'mongo test output'
       };
 
       const result = mongoScriptService.formatScriptOutput(executionResult);
       const parsed = JSON.parse(result);
 
       expect(parsed.console_output).toBe('mongo test output');
-      expect(parsed.metadata.database).toBe('test_mongo');
     });
 
     it('should handle missing fields', () => {
@@ -333,7 +331,6 @@ describe('MongoDB Script Service', () => {
       const parsed = JSON.parse(result);
 
       expect(parsed.console_output).toBeNull();
-      expect(parsed.metadata).toBeNull();
     });
   });
 

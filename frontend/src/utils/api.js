@@ -1,0 +1,124 @@
+const API_BASE_URL = 'http://localhost:4000/api/v1';
+
+// Get auth token from localStorage
+const getToken = () => localStorage.getItem('token');
+
+// API request helper with error handling
+export async function apiRequest(endpoint, options = {}) {
+  const token = getToken();
+  
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (response.status === 401 && token && endpoint !== '/auth/login') {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
+
+    if (response.status === 403) {
+      throw new Error('You do not have permission to perform this action.');
+    }
+
+    if (!response.ok) {
+      // Handle Zod validation errors
+      if (data.errors && Array.isArray(data.errors)) {
+        const errorMessages = data.errors.map(err => `${err.field}: ${err.message}`).join(', ');
+        throw new Error(errorMessages);
+      }
+      throw new Error(data.message || 'Something went wrong');
+    }
+
+    return data;
+  } catch (error) {
+    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      throw new Error('Network error. Please check your connection.');
+    }
+    throw error;
+  }
+}
+
+// Auth APIs
+export const authAPI = {
+  login: (credentials) => apiRequest('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  }),
+};
+
+// Database APIs
+export const dbAPI = {
+  getTypes: () => apiRequest('/db/types'),
+  getInstances: (type) => apiRequest(`/db/instances?type=${type}`),
+  getDatabases: (instanceId) => apiRequest(`/db/instances/${instanceId}/name`),
+};
+
+// Request APIs
+export const requestAPI = {
+  submit: (data) => apiRequest('/request', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getMyRequests: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Only add params if they have values
+    if (params.status && params.status !== 'all') {
+      queryParams.append('status', params.status);
+    }
+    if (params.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
+    }
+    if (params.limit !== undefined && params.limit !== null) {
+      queryParams.append('limit', String(params.limit));
+    }
+    if (params.offset !== undefined && params.offset !== null) {
+      queryParams.append('offset', String(params.offset));
+    }
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/request/mine${queryString ? `?${queryString}` : ''}`);
+  },
+  getResult: (reqId) => apiRequest(`/request/${reqId}/result`),
+};
+
+// Approval APIs
+export const approvalAPI = {
+  getPendingRequests: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Only add params if they have values
+    if (params.status && params.status !== 'all') {
+      queryParams.append('status', params.status);
+    }
+    if (params.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
+    }
+    if (params.limit !== undefined && params.limit !== null) {
+      queryParams.append('limit', String(params.limit));
+    }
+    if (params.offset !== undefined && params.offset !== null) {
+      queryParams.append('offset', String(params.offset));
+    }
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/approvals${queryString ? `?${queryString}` : ''}`);
+  },
+  approveOrReject: (reqId, action, reason = null) => apiRequest(`/approvals/${reqId}/action`, {
+    method: 'POST',
+    body: JSON.stringify({ action, reason }),
+  }),
+};
+
+export default apiRequest;

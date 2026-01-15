@@ -237,11 +237,13 @@ describe('MongoDB Execution Service', () => {
         collection: 'users'
       });
 
-      expect(result).toContain('1 documents returned');
-      expect(result).toContain('Test');
+      const parsed = JSON.parse(result);
+      expect(parsed.console_output).toContain('1 documents returned');
+      expect(parsed.result_data).toHaveLength(1);
+      expect(parsed.result_data[0].name).toBe('Test');
     });
 
-    it('should truncate large result sets', () => {
+    it('should not truncate result sets anymore', () => {
       const largeResult = Array(150).fill({ _id: 'test' });
       const result = mongoExecutionService.formatMongoOutput({
         success: true,
@@ -251,9 +253,9 @@ describe('MongoDB Execution Service', () => {
         collection: 'users'
       });
 
-      expect(result).toContain('150 documents returned');
-      expect(result).toContain('First 100 documents shown');
-      expect(result).toContain('50 more documents');
+      const parsed = JSON.parse(result);
+      expect(parsed.console_output).toContain('150 documents returned');
+      expect(parsed.result_data).toHaveLength(150);
     });
   });
 

@@ -315,17 +315,13 @@ describe('PostgreSQL Script Service', () => {
     it('should return formatted JSON for successful execution', () => {
       const executionResult = {
         success: true,
-        output: 'test output',
-        metadata: { database: 'test_db' },
-        queries: [{ query_number: 1, sql: 'SELECT 1' }]
+        output: 'test output'
       };
 
       const result = postgresScriptService.formatScriptOutput(executionResult);
       const parsed = JSON.parse(result);
 
       expect(parsed.console_output).toBe('test output');
-      expect(parsed.metadata.database).toBe('test_db');
-      expect(parsed.queries).toHaveLength(1);
     });
 
     it('should handle missing fields', () => {
@@ -337,8 +333,6 @@ describe('PostgreSQL Script Service', () => {
       const parsed = JSON.parse(result);
 
       expect(parsed.console_output).toBeNull();
-      expect(parsed.metadata).toBeNull();
-      expect(parsed.queries).toEqual([]);
     });
   });
 

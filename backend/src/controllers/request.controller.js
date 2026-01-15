@@ -103,6 +103,7 @@ const getMyRequests = async (req, res) => {
       comments: row.comments,
       created_at: row.created_at,
       approved_at: row.approved_at,
+      pod_id: row.pod_id,
       instance_name: row.instance_name,
       database_type: row.database_type,
       result: row.executed_at

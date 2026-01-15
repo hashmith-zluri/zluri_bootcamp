@@ -446,9 +446,7 @@ class PostgresScriptExecutionService {
 
     // Return structured output as JSON
     const result = {
-      console_output: executionResult.output || null,
-      metadata: executionResult.metadata || null,
-      queries: executionResult.queries || []
+      console_output: executionResult.output || null
     };
 
     return JSON.stringify(result, null, 2);

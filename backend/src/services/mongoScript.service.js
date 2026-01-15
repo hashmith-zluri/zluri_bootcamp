@@ -366,8 +366,7 @@ class MongoScriptExecutionService {
 
     // Return structured output as JSON
     const result = {
-      console_output: executionResult.output || null,
-      metadata: executionResult.metadata || null
+      console_output: executionResult.output || null
     };
 
     return JSON.stringify(result, null, 2);

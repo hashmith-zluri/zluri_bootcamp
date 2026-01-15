@@ -100,6 +100,7 @@ const getUserRequests = async (userId, options = {}) => {
       qr.comments,
       qr.created_at,
       qr.approved_at,
+      qr.pod_id,
       di.name AS instance_name,
       di.engine AS database_type,
       el.output,
