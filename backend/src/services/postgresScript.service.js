@@ -1,38 +1,29 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { spawn } = require('child_process');
-const { query } = require('../config/db');
+const QueryRequestRepository = require('../repositories/queryRequest.repository');
+const ExecutionLogRepository = require('../repositories/executionLog.repository');
+const DbInstanceRepository = require('../repositories/dbInstance.repository');
+const slackService = require('./slack.service');
 
 class PostgresScriptExecutionService {
   async executePostgresScript(requestId) {
     let executionResult = null;
     
     try {
-      const requestResult = await query(
-        `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine
-         FROM query_requests qr 
-         JOIN db_instances di ON qr.db_instance_id = di.id 
-         WHERE qr.id = $1`,
-        [requestId]
-      );
+      const request = await QueryRequestRepository.findWithInstance(requestId);
 
-      if (requestResult.rows.length === 0) {
+      if (!request) {
         throw new Error(`Request ${requestId} not found`);
       }
-
-      const request = requestResult.rows[0];
       
-      // Validate request status
       if (request.status !== 'APPROVED') {
         throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
       }
 
-      // Validate database engine
       if (request.engine !== 'POSTGRES') {
         throw new Error(`Unsupported database engine: ${request.engine}`);
       }
 
-      // Validate script exists (now script_path contains the script content)
       if (!request.script_path) {
         throw new Error('No script content found in request');
       }
@@ -42,27 +33,21 @@ class PostgresScriptExecutionService {
       console.log(`Database: ${request.database_name}`);
       console.log(`Script length: ${request.script_path.length} characters`);
 
-      // Update status to EXECUTING
       await this.updateRequestStatus(requestId, 'EXECUTING');
 
-      // Validate script content
       this.validateScriptContent(request.script_path);
 
-      // Execute the script (script_path now contains the actual script content)
       executionResult = await this.executeScript(
         request.db_instance_id,
         request.database_name,
-        request.script_path // This is now the script content, not a file path
+        request.script_path
       );
 
-      // Determine final status
       const finalStatus = executionResult.success ? 'EXECUTED' : 'FAILED';
       
-      // Update request status
       await this.updateRequestStatus(requestId, finalStatus);
-
-      // Log execution result
       await this.logExecution(requestId, executionResult);
+      await this.sendExecutionNotification(requestId, executionResult);
 
       return {
         requestId,
@@ -76,15 +61,15 @@ class PostgresScriptExecutionService {
     } catch (error) {
       console.error(`PostgreSQL script execution failed for request ${requestId}:`, error.message);
       
-      // Update status to FAILED
       await this.updateRequestStatus(requestId, 'FAILED');
       
-      // Log the failure
-      await this.logExecution(requestId, {
+      const failureResult = {
         success: false,
         error: error.message,
         executionTime: 0
-      });
+      };
+      await this.logExecution(requestId, failureResult);
+      await this.sendExecutionNotification(requestId, failureResult);
 
       return {
         requestId,
@@ -97,15 +82,45 @@ class PostgresScriptExecutionService {
     }
   }
 
+  async sendExecutionNotification(requestId, executionResult) {
+    if (!slackService.isEnabled()) return;
+
+    try {
+      const requestData = await QueryRequestRepository.findForNotification(requestId);
+
+      if (!requestData) {
+        console.warn(`Could not find request ${requestId} for Slack notification`);
+        return;
+      }
+
+      const slackRequestData = {
+        req_id: requestData.id,
+        requester_name: requestData.requester_name,
+        requester_email: requestData.requester_email,
+        database_type: requestData.database_type,
+        database_name: requestData.database_name,
+        instance_name: requestData.instance_name,
+        query: requestData.query_text,
+        script: requestData.script_path
+      };
+
+      if (executionResult.success) {
+        await slackService.notifyApprovalSuccess(slackRequestData, executionResult);
+      } else {
+        await slackService.notifyApprovalFailure(slackRequestData, executionResult);
+      }
+    } catch (error) {
+      console.error(`Failed to send Slack notification for request ${requestId}:`, error.message);
+    }
+  }
+
   validateScriptContent(scriptContent) {
     const content = scriptContent.trim();
     
-    // Check if script is not empty
     if (!content) {
       throw new Error('Script content is empty');
     }
 
-    // Check for any console.log() call (more flexible)
     if (!content.includes('console.log(')) {
       throw new Error('Script must include "console.log()" to capture execution results');
     }
@@ -117,15 +132,8 @@ class PostgresScriptExecutionService {
     const startTime = Date.now();
     
     try {
-      // Get instance configuration
-      const instanceResult = await query(
-        'SELECT * FROM db_instances WHERE id = $1',
-        [instanceId]
-      );
+      const instance = await DbInstanceRepository.findById(instanceId);
       
-      const instance = instanceResult.rows[0];
-      
-      // Execute JavaScript directly (no file extension check needed)
       return await this.executeJSScript(instance, databaseName, scriptContent, startTime);
       
     } catch (error) {
@@ -140,10 +148,8 @@ class PostgresScriptExecutionService {
 
   async executeJSScript(instance, databaseName, scriptContent, startTime) {
     return new Promise((resolve) => {
-      const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
-      const path = require('path');
+      const { Worker } = require('worker_threads');
       
-      // Create worker script content
       const workerScript = `
         const { parentPort, workerData } = require('worker_threads');
         const { Client } = require('pg');
@@ -155,7 +161,6 @@ class PostgresScriptExecutionService {
           let queryCount = 0;
           
           try {
-            // Set up console capture - only captures user's console.log
             console.log = (...args) => {
               const logMessage = args.map(arg => 
                 typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
@@ -170,11 +175,9 @@ class PostgresScriptExecutionService {
               userOutput += '[ERROR] ' + logMessage + '\\n';
             };
             
-            // Create database client
             client = new Client(workerData.dbConfig);
             await client.connect();
             
-            // Set up global query function
             global.query = async (sql, params = []) => {
               try {
                 queryCount++;
@@ -203,10 +206,7 @@ class PostgresScriptExecutionService {
               }
             };
             
-            // Set up environment variables
             global.process = { env: workerData.env };
-            
-            // Set up safe globals
             global.JSON = JSON;
             global.Date = Date;
             global.Math = Math;
@@ -218,14 +218,12 @@ class PostgresScriptExecutionService {
             global.setTimeout = setTimeout;
             global.clearTimeout = clearTimeout;
             
-            // Execute user script
             const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
             const userFunction = new AsyncFunction(workerData.scriptContent);
             await userFunction();
             
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Send structured result
             parentPort.postMessage({
               success: true,
               output: userOutput.trim(),
@@ -285,14 +283,11 @@ class PostgresScriptExecutionService {
         });
       `;
       
-      // Write worker script to temp file (outside src to avoid nodemon restart)
       const tempWorkerFile = path.join(__dirname, '..', '..', 'temp', `worker_${Date.now()}.js`);
       
-      // Ensure temp directory exists
       fs.mkdir(path.dirname(tempWorkerFile), { recursive: true })
         .then(() => fs.writeFile(tempWorkerFile, workerScript))
         .then(() => {
-          // Create worker with data
           const worker = new Worker(tempWorkerFile, {
             workerData: {
               dbConfig: {
@@ -319,7 +314,6 @@ class PostgresScriptExecutionService {
             }
           });
           
-          // Set timeout for worker execution
           const timeout = setTimeout(() => {
             worker.terminate();
             resolve({
@@ -328,32 +322,25 @@ class PostgresScriptExecutionService {
               executionTime: Date.now() - startTime,
               output: 'Script execution timed out after 5 minutes'
             });
-          }, 300000); // 5 minutes
+          }, 300000);
           
-          // Handle worker messages
           worker.on('message', (result) => {
             clearTimeout(timeout);
             const executionTime = Date.now() - startTime;
             
-            // Clean up temp file safely
             fs.unlink(tempWorkerFile).catch(err => {
               if (err.code !== 'ENOENT') {
                 console.error('Failed to cleanup temp worker file:', err);
               }
             });
             
-            resolve({
-              ...result,
-              executionTime
-            });
+            resolve({ ...result, executionTime });
           });
           
-          // Handle worker errors
           worker.on('error', (error) => {
             clearTimeout(timeout);
             const executionTime = Date.now() - startTime;
             
-            // Clean up temp file safely
             fs.unlink(tempWorkerFile).catch(err => {
               if (err.code !== 'ENOENT') {
                 console.error('Failed to cleanup temp worker file:', err);
@@ -368,14 +355,12 @@ class PostgresScriptExecutionService {
             });
           });
           
-          // Handle worker exit
           worker.on('exit', (code) => {
             clearTimeout(timeout);
             
             if (code !== 0) {
               const executionTime = Date.now() - startTime;
               
-              // Clean up temp file safely
               fs.unlink(tempWorkerFile).catch(err => {
                 if (err.code !== 'ENOENT') {
                   console.error('Failed to cleanup temp worker file:', err);
@@ -402,13 +387,9 @@ class PostgresScriptExecutionService {
     });
   }
 
-  // Update request status in database
   async updateRequestStatus(requestId, status) {
     try {
-      await query(
-        'UPDATE query_requests SET status = $1 WHERE id = $2',
-        [status, requestId]
-      );
+      await QueryRequestRepository.updateStatus(requestId, status);
       console.log(`Updated request ${requestId} status to ${status}`);
     } catch (error) {
       console.error(`Failed to update request ${requestId} status:`, error.message);
@@ -416,24 +397,16 @@ class PostgresScriptExecutionService {
     }
   }
 
-  // Log execution result to execution_logs table
   async logExecution(requestId, executionResult) {
     try {
-      const logResult = await query(
-        `INSERT INTO execution_logs 
-         (request_id, success, output, error, execution_time_ms) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id`,
-        [
-          requestId,
-          executionResult.success,
-          this.formatScriptOutput(executionResult),
-          executionResult.error || null,
-          executionResult.executionTime || 0
-        ]
-      );
-      
-      console.log(`Logged script execution result for request ${requestId}, log ID: ${logResult.rows[0].id}`);
+      const logResult = await ExecutionLogRepository.create({
+        requestId,
+        success: executionResult.success,
+        output: this.formatScriptOutput(executionResult),
+        error: executionResult.error || null,
+        executionTimeMs: executionResult.executionTime || 0
+      });
+      console.log(`Logged script execution result for request ${requestId}, log ID: ${logResult.id}`);
     } catch (error) {
       console.error(`Failed to log script execution for request ${requestId}:`, error.message);
     }
@@ -444,7 +417,6 @@ class PostgresScriptExecutionService {
       return null;
     }
 
-    // Return structured output as JSON
     const result = {
       console_output: executionResult.output || null
     };
@@ -452,27 +424,17 @@ class PostgresScriptExecutionService {
     return JSON.stringify(result, null, 2);
   }
 
-  // Get execution result for a script request
   async getScriptExecutionResult(requestId) {
     try {
-      const result = await query(
-        `SELECT el.*, qr.status, qr.script_path 
-         FROM execution_logs el 
-         JOIN query_requests qr ON el.request_id = qr.id 
-         WHERE el.request_id = $1 AND qr.script_path IS NOT NULL
-         ORDER BY el.executed_at DESC 
-         LIMIT 1`,
-        [requestId]
-      );
+      const log = await ExecutionLogRepository.findLatestScriptExecution(requestId);
 
-      if (result.rows.length === 0) {
+      if (!log) {
         return {
           status: 'pending',
           message: 'Script not yet executed'
         };
       }
 
-      const log = result.rows[0];
       return {
         status: log.success ? 'success' : 'failure',
         output: log.output,

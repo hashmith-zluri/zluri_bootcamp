@@ -1,6 +1,7 @@
 const pods = require("../config/pods");
 const executionService = require("../services/execution.service");
 const approvalService = require("../services/approval.service");
+const slackService = require("../services/slack.service");
 
 const getApprovalRequests = async (req, res) => {
   const managerEmail = req.user?.email;
@@ -166,6 +167,34 @@ const approveOrReject = async (req, res) => {
         }
 
         await approvalService.logRejection(req_id, reason);
+
+        // Send Slack notification for rejection
+        if (slackService.isEnabled()) {
+          try {
+            // Fetch complete request data for notification
+            const requestData = await approvalService.getRequestForNotification(req_id);
+            
+            if (requestData) {
+              // Get pod name from pod_id
+              const pod = pods.find(p => p.id === requestPodId);
+              const podName = pod ? pod.name : requestPodId;
+
+              await slackService.notifyRejection({
+                req_id: rejectedRequest.id,
+                requester_name: requestData.requester_name,
+                requester_email: requestData.requester_email,
+                database_type: requestData.database_type,
+                database_name: requestData.database_name,
+                instance_name: requestData.instance_name,
+                query: requestData.query_text,
+                script: requestData.script_path,
+                pod_name: podName
+              }, reason);
+            }
+          } catch (slackError) {
+            console.error('Slack notification failed:', slackError.message);
+          }
+        }
   
         return res.status(200).json({
           success: true,

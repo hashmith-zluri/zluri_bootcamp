@@ -145,5 +145,25 @@ describe('Validate Middleware', () => {
 
       expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
     });
+
+    it('should handle ZodError with empty issues array', () => {
+      const { ZodError } = require('zod');
+      const schema = {
+        parse: () => {
+          const error = new ZodError([]);
+          throw error;
+        }
+      };
+
+      validate({ body: schema })(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Validation failed'
+        })
+      );
+    });
   });
 });

@@ -32,4 +32,8 @@ app.use(`${API_VERSION}/request`, requestRoutes);
 const approvalroutes = require("./routes/approval.routes")
 app.use(`${API_VERSION}/approvals`, approvalroutes);
 
+// Slack routes
+const slackRoutes = require("./routes/slack.routes");
+app.use(`${API_VERSION}/slack`, slackRoutes);
+
 module.exports = app;

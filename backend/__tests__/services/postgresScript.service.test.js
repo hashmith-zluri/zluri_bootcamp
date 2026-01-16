@@ -1,7 +1,9 @@
 const postgresScriptService = require('../../src/services/postgresScript.service');
 const { query } = require('../../src/config/db');
+const slackService = require('../../src/services/slack.service');
 
 jest.mock('../../src/config/db');
+jest.mock('../../src/services/slack.service');
 
 // Mock fs.promises
 jest.mock('fs', () => ({
@@ -467,5 +469,94 @@ describe('PostgreSQL Script Service', () => {
     }, 15000);
 
 
+  });
+});
+
+describe('sendExecutionNotification', () => {
+  beforeEach(() => {
+    slackService.isEnabled.mockReset();
+    slackService.notifyApprovalSuccess.mockReset();
+    slackService.notifyApprovalFailure.mockReset();
+  });
+
+  it('should not send notification when Slack is disabled', async () => {
+    slackService.isEnabled.mockReturnValue(false);
+    
+    await postgresScriptService.sendExecutionNotification(1, { success: true });
+    
+    expect(slackService.notifyApprovalSuccess).not.toHaveBeenCalled();
+    expect(slackService.notifyApprovalFailure).not.toHaveBeenCalled();
+  });
+
+  it('should send success notification when execution succeeds', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    slackService.notifyApprovalSuccess.mockResolvedValue();
+    
+    query.mockResolvedValue({
+      rows: [{
+        id: 1,
+        query_text: null,
+        script_path: 'console.log("test")',
+        database_name: 'test_db',
+        requester_name: 'John Doe',
+        requester_email: 'john@test.com',
+        instance_name: 'local-postgres',
+        database_type: 'POSTGRES'
+      }]
+    });
+
+    await postgresScriptService.sendExecutionNotification(1, { success: true, output: 'Success' });
+
+    expect(slackService.notifyApprovalSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        req_id: 1,
+        requester_name: 'John Doe',
+        database_type: 'POSTGRES',
+        script: 'console.log("test")'
+      }),
+      expect.objectContaining({ success: true })
+    );
+  });
+
+  it('should send failure notification when execution fails', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    slackService.notifyApprovalFailure.mockResolvedValue();
+    
+    query.mockResolvedValue({
+      rows: [{
+        id: 1,
+        query_text: null,
+        script_path: 'console.log("test")',
+        database_name: 'test_db',
+        requester_name: 'John Doe',
+        requester_email: 'john@test.com',
+        instance_name: 'local-postgres',
+        database_type: 'POSTGRES'
+      }]
+    });
+
+    await postgresScriptService.sendExecutionNotification(1, { success: false, error: 'Script failed' });
+
+    expect(slackService.notifyApprovalFailure).toHaveBeenCalled();
+  });
+
+  it('should handle request not found gracefully', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockResolvedValue({ rows: [] });
+
+    await postgresScriptService.sendExecutionNotification(999, { success: true });
+    
+    expect(slackService.notifyApprovalSuccess).not.toHaveBeenCalled();
+  });
+
+  it('should handle database errors gracefully', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockRejectedValue(new Error('Database error'));
+
+    // Should not throw
+    await expect(postgresScriptService.sendExecutionNotification(1, { success: true }))
+      .resolves.not.toThrow();
   });
 });

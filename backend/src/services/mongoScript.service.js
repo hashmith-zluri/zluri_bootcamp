@@ -1,37 +1,28 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { query } = require('../config/db');
+const QueryRequestRepository = require('../repositories/queryRequest.repository');
+const ExecutionLogRepository = require('../repositories/executionLog.repository');
+const slackService = require('./slack.service');
 
 class MongoScriptExecutionService {
   async executeMongoScript(requestId) {
     let executionResult = null;
     
     try {
-      const requestResult = await query(
-        `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine
-         FROM query_requests qr 
-         JOIN db_instances di ON qr.db_instance_id = di.id 
-         WHERE qr.id = $1`,
-        [requestId]
-      );
+      const request = await QueryRequestRepository.findWithInstance(requestId);
 
-      if (requestResult.rows.length === 0) {
+      if (!request) {
         throw new Error(`Request ${requestId} not found`);
       }
 
-      const request = requestResult.rows[0];
-
-      // Validate request status
       if (request.status !== 'APPROVED') {
         throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
       }
 
-      // Validate database engine
       if (request.engine !== 'MONGO') {
         throw new Error(`Expected MongoDB instance, got: ${request.engine}`);
       }
 
-      // Validate script exists
       if (!request.script_path) {
         throw new Error('No script content found in request');
       }
@@ -41,27 +32,21 @@ class MongoScriptExecutionService {
       console.log(`Database: ${request.database_name}`);
       console.log(`Script length: ${request.script_path.length} characters`);
 
-      // Update status to EXECUTING
       await this.updateRequestStatus(requestId, 'EXECUTING');
 
-      // Validate script content
       this.validateScriptContent(request.script_path);
 
-      // Execute the script
       executionResult = await this.executeScript(
         request,
         request.database_name,
         request.script_path
       );
 
-      // Determine final status
       const finalStatus = executionResult.success ? 'EXECUTED' : 'FAILED';
       
-      // Update request status
       await this.updateRequestStatus(requestId, finalStatus);
-
-      // Log execution result
       await this.logExecution(requestId, executionResult);
+      await this.sendExecutionNotification(requestId, executionResult);
 
       return {
         requestId,
@@ -75,15 +60,15 @@ class MongoScriptExecutionService {
     } catch (error) {
       console.error(`MongoDB script execution failed for request ${requestId}:`, error.message);
       
-      // Update status to FAILED
       await this.updateRequestStatus(requestId, 'FAILED');
       
-      // Log the failure
-      await this.logExecution(requestId, {
+      const failureResult = {
         success: false,
         error: error.message,
         executionTime: 0
-      });
+      };
+      await this.logExecution(requestId, failureResult);
+      await this.sendExecutionNotification(requestId, failureResult);
 
       return {
         requestId,
@@ -96,6 +81,37 @@ class MongoScriptExecutionService {
     }
   }
 
+  async sendExecutionNotification(requestId, executionResult) {
+    if (!slackService.isEnabled()) return;
+
+    try {
+      const requestData = await QueryRequestRepository.findForNotification(requestId);
+
+      if (!requestData) {
+        console.warn(`Could not find request ${requestId} for Slack notification`);
+        return;
+      }
+
+      const slackRequestData = {
+        req_id: requestData.id,
+        requester_name: requestData.requester_name,
+        requester_email: requestData.requester_email,
+        database_type: requestData.database_type,
+        database_name: requestData.database_name,
+        instance_name: requestData.instance_name,
+        query: requestData.query_text,
+        script: requestData.script_path
+      };
+
+      if (executionResult.success) {
+        await slackService.notifyApprovalSuccess(slackRequestData, executionResult);
+      } else {
+        await slackService.notifyApprovalFailure(slackRequestData, executionResult);
+      }
+    } catch (error) {
+      console.error(`Failed to send Slack notification for request ${requestId}:`, error.message);
+    }
+  }
 
   validateScriptContent(scriptContent) {
     const content = scriptContent.trim();
@@ -104,7 +120,6 @@ class MongoScriptExecutionService {
       throw new Error('Script content is empty');
     }
 
-    // Check for console.log() to capture results
     if (!content.includes('console.log(')) {
       throw new Error('Script must include "console.log()" to capture execution results');
     }
@@ -132,10 +147,8 @@ class MongoScriptExecutionService {
     return new Promise((resolve) => {
       const { Worker } = require('worker_threads');
       
-      // Build MongoDB connection string (no auth since db_instances doesn't store credentials)
       const connectionString = `mongodb://${instance.host || 'localhost'}:${instance.port || 27017}/${databaseName}`;
       
-      // Create worker script content
       const workerScript = `
         const { parentPort, workerData } = require('worker_threads');
         const { MongoClient, ObjectId } = require('mongodb');
@@ -143,11 +156,8 @@ class MongoScriptExecutionService {
         async function executeScript() {
           let client = null;
           let userOutput = '';
-          let operationDetails = [];
-          let operationCount = 0;
           
           try {
-            // Set up console capture - only captures user's console.log
             console.log = (...args) => {
               const logMessage = args.map(arg => 
                 typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
@@ -162,7 +172,6 @@ class MongoScriptExecutionService {
               userOutput += '[ERROR] ' + logMessage + '\\n';
             };
             
-            // Create MongoDB client
             client = new MongoClient(workerData.connectionString, {
               maxPoolSize: 5,
               serverSelectionTimeoutMS: 10000,
@@ -171,15 +180,12 @@ class MongoScriptExecutionService {
             
             await client.connect();
             
-            // Get database reference
             const db = client.db(workerData.databaseName);
             
-            // Set up global db object for script access
             global.db = db;
             global.client = client;
             global.collection = (name) => db.collection(name);
             
-            // Set up safe globals
             global.JSON = JSON;
             global.Date = Date;
             global.Math = Math;
@@ -192,14 +198,12 @@ class MongoScriptExecutionService {
             global.clearTimeout = clearTimeout;
             global.ObjectId = ObjectId;
             
-            // Execute user script
             const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
             const userFunction = new AsyncFunction(workerData.scriptContent);
             await userFunction();
             
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Send structured result
             parentPort.postMessage({
               success: true,
               output: userOutput.trim(),
@@ -255,7 +259,6 @@ class MongoScriptExecutionService {
         });
       `;
       
-      // Write worker script to temp file (outside src to avoid nodemon restart)
       const tempWorkerFile = path.join(__dirname, '..', '..', 'temp', `mongo_worker_${Date.now()}.js`);
       
       fs.mkdir(path.dirname(tempWorkerFile), { recursive: true })
@@ -271,7 +274,6 @@ class MongoScriptExecutionService {
             }
           });
           
-          // 5 minute timeout
           const timeout = setTimeout(() => {
             worker.terminate();
             resolve({
@@ -323,13 +325,9 @@ class MongoScriptExecutionService {
     });
   }
 
-
   async updateRequestStatus(requestId, status) {
     try {
-      await query(
-        'UPDATE query_requests SET status = $1 WHERE id = $2',
-        [status, requestId]
-      );
+      await QueryRequestRepository.updateStatus(requestId, status);
       console.log(`Updated request ${requestId} status to ${status}`);
     } catch (error) {
       console.error(`Failed to update request ${requestId} status:`, error.message);
@@ -339,21 +337,14 @@ class MongoScriptExecutionService {
 
   async logExecution(requestId, executionResult) {
     try {
-      const logResult = await query(
-        `INSERT INTO execution_logs 
-         (request_id, success, output, error, execution_time_ms) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id`,
-        [
-          requestId,
-          executionResult.success,
-          this.formatScriptOutput(executionResult),
-          executionResult.error || null,
-          executionResult.executionTime || 0
-        ]
-      );
-      
-      console.log(`Logged MongoDB script execution for request ${requestId}, log ID: ${logResult.rows[0].id}`);
+      const logResult = await ExecutionLogRepository.create({
+        requestId,
+        success: executionResult.success,
+        output: this.formatScriptOutput(executionResult),
+        error: executionResult.error || null,
+        executionTimeMs: executionResult.executionTime || 0
+      });
+      console.log(`Logged MongoDB script execution for request ${requestId}, log ID: ${logResult.id}`);
     } catch (error) {
       console.error(`Failed to log script execution for request ${requestId}:`, error.message);
     }
@@ -364,7 +355,6 @@ class MongoScriptExecutionService {
       return null;
     }
 
-    // Return structured output as JSON
     const result = {
       console_output: executionResult.output || null
     };
@@ -374,24 +364,15 @@ class MongoScriptExecutionService {
 
   async getScriptExecutionResult(requestId) {
     try {
-      const result = await query(
-        `SELECT el.*, qr.status, qr.script_path 
-         FROM execution_logs el 
-         JOIN query_requests qr ON el.request_id = qr.id 
-         WHERE el.request_id = $1 AND qr.script_path IS NOT NULL
-         ORDER BY el.executed_at DESC 
-         LIMIT 1`,
-        [requestId]
-      );
+      const log = await ExecutionLogRepository.findLatestScriptExecution(requestId);
 
-      if (result.rows.length === 0) {
+      if (!log) {
         return {
           status: 'pending',
           message: 'Script not yet executed'
         };
       }
 
-      const log = result.rows[0];
       return {
         status: log.success ? 'success' : 'failure',
         output: log.output,

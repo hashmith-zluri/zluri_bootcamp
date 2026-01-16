@@ -347,3 +347,91 @@ describe('MongoDB Execution Service', () => {
     });
   });
 });
+
+describe('sendExecutionNotification', () => {
+  let slackService;
+  
+  beforeEach(() => {
+    slackService = require('../../src/services/slack.service');
+    slackService.isEnabled = jest.fn();
+    slackService.notifyApprovalSuccess = jest.fn().mockResolvedValue();
+    slackService.notifyApprovalFailure = jest.fn().mockResolvedValue();
+  });
+
+  it('should not send notification when Slack is disabled', async () => {
+    slackService.isEnabled.mockReturnValue(false);
+    
+    await mongoExecutionService.sendExecutionNotification(1, { success: true });
+    
+    expect(slackService.notifyApprovalSuccess).not.toHaveBeenCalled();
+  });
+
+  it('should send success notification when execution succeeds', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockResolvedValue({
+      rows: [{
+        id: 1,
+        query_text: 'db.users.find({})',
+        script_path: null,
+        database_name: 'test_db',
+        requester_name: 'John Doe',
+        requester_email: 'john@test.com',
+        instance_name: 'local-mongo',
+        database_type: 'MONGO'
+      }]
+    });
+
+    await mongoExecutionService.sendExecutionNotification(1, { success: true, output: 'Success' });
+
+    expect(slackService.notifyApprovalSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        req_id: 1,
+        requester_name: 'John Doe',
+        database_type: 'MONGO'
+      }),
+      expect.objectContaining({ success: true })
+    );
+  });
+
+  it('should send failure notification when execution fails', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockResolvedValue({
+      rows: [{
+        id: 1,
+        query_text: 'db.users.find({})',
+        script_path: null,
+        database_name: 'test_db',
+        requester_name: 'John Doe',
+        requester_email: 'john@test.com',
+        instance_name: 'local-mongo',
+        database_type: 'MONGO'
+      }]
+    });
+
+    await mongoExecutionService.sendExecutionNotification(1, { success: false, error: 'Query failed' });
+
+    expect(slackService.notifyApprovalFailure).toHaveBeenCalled();
+  });
+
+  it('should handle request not found gracefully', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockResolvedValue({ rows: [] });
+
+    // Should not throw
+    await expect(mongoExecutionService.sendExecutionNotification(999, { success: true }))
+      .resolves.not.toThrow();
+  });
+
+  it('should handle database errors gracefully', async () => {
+    slackService.isEnabled.mockReturnValue(true);
+    
+    query.mockRejectedValue(new Error('Database error'));
+
+    // Should not throw
+    await expect(mongoExecutionService.sendExecutionNotification(1, { success: true }))
+      .resolves.not.toThrow();
+  });
+});

@@ -1,36 +1,27 @@
 const { executeTargetQuery } = require('../config/postgresDb');
-const { query } = require('../config/db');
+const QueryRequestRepository = require('../repositories/queryRequest.repository');
+const ExecutionLogRepository = require('../repositories/executionLog.repository');
+const slackService = require('./slack.service');
 
 class PostgresExecutionService {
   async executePostgresQuery(requestId) {
     let executionResult = null;
     
     try {
-      const requestResult = await query(
-        `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine
-         FROM query_requests qr 
-         JOIN db_instances di ON qr.db_instance_id = di.id 
-         WHERE qr.id = $1`,
-        [requestId]
-      );
+      const request = await QueryRequestRepository.findWithInstance(requestId);
 
-      if (requestResult.rows.length === 0) {
+      if (!request) {
         throw new Error(`Request ${requestId} not found`);
       }
-
-      const request = requestResult.rows[0];
       
-      // Validate request status
       if (request.status !== 'APPROVED') {
         throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
       }
 
-      // Validate database engine
       if (request.engine !== 'POSTGRES') {
         throw new Error(`Unsupported database engine: ${request.engine}`);
       }
 
-      // Validate query exists
       if (!request.query_text) {
         throw new Error('No query text found in request');
       }
@@ -40,24 +31,24 @@ class PostgresExecutionService {
       console.log(`Database: ${request.database_name}`);
       console.log(`Query: ${request.query_text}`);
 
-      // Update status to EXECUTING
       await this.updateRequestStatus(requestId, 'EXECUTING');
 
-      // Execute the query on target database
       executionResult = await executeTargetQuery(
         request.db_instance_id,
         request.database_name,
         request.query_text
       );
 
-      // Determine final status
       const finalStatus = executionResult.success ? 'EXECUTED' : 'FAILED';
       
-      // Update request status
       await this.updateRequestStatus(requestId, finalStatus);
-
-      // Log execution result
       await this.logExecution(requestId, executionResult);
+
+      if (executionResult.success) {
+        executionResult.output = this.formatOutput(executionResult);
+      }
+
+      await this.sendExecutionNotification(requestId, executionResult);
 
       return {
         requestId,
@@ -72,15 +63,15 @@ class PostgresExecutionService {
     } catch (error) {
       console.error(`PostgreSQL execution failed for request ${requestId}:`, error.message);
       
-      // Update status to FAILED
       await this.updateRequestStatus(requestId, 'FAILED');
       
-      // Log the failure
-      await this.logExecution(requestId, {
+      const failureResult = {
         success: false,
         error: error.message,
         executionTime: 0
-      });
+      };
+      await this.logExecution(requestId, failureResult);
+      await this.sendExecutionNotification(requestId, failureResult);
 
       return {
         requestId,
@@ -94,12 +85,41 @@ class PostgresExecutionService {
     }
   }
 
-    async updateRequestStatus(requestId, status) {
+  async sendExecutionNotification(requestId, executionResult) {
+    if (!slackService.isEnabled()) return;
+
     try {
-      await query(
-        'UPDATE query_requests SET status = $1 WHERE id = $2',
-        [status, requestId]
-      );
+      const requestData = await QueryRequestRepository.findForNotification(requestId);
+
+      if (!requestData) {
+        console.warn(`Could not find request ${requestId} for Slack notification`);
+        return;
+      }
+
+      const slackRequestData = {
+        req_id: requestData.id,
+        requester_name: requestData.requester_name,
+        requester_email: requestData.requester_email,
+        database_type: requestData.database_type,
+        database_name: requestData.database_name,
+        instance_name: requestData.instance_name,
+        query: requestData.query_text,
+        script: requestData.script_path
+      };
+
+      if (executionResult.success) {
+        await slackService.notifyApprovalSuccess(slackRequestData, executionResult);
+      } else {
+        await slackService.notifyApprovalFailure(slackRequestData, executionResult);
+      }
+    } catch (error) {
+      console.error(`Failed to send Slack notification for request ${requestId}:`, error.message);
+    }
+  }
+
+  async updateRequestStatus(requestId, status) {
+    try {
+      await QueryRequestRepository.updateStatus(requestId, status);
       console.log(`Updated request ${requestId} status to ${status}`);
     } catch (error) {
       console.error(`Failed to update request ${requestId} status:`, error.message);
@@ -107,24 +127,16 @@ class PostgresExecutionService {
     }
   }
 
-  // Log execution result to execution_logs table
   async logExecution(requestId, executionResult) {
     try {
-      const logResult = await query(
-        `INSERT INTO execution_logs 
-         (request_id, success, output, error, execution_time_ms) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id`,
-        [
-          requestId,
-          executionResult.success,
-          this.formatOutput(executionResult),
-          executionResult.error || null,
-          executionResult.executionTime || 0
-        ]
-      );
-      
-      console.log(`Logged execution result for request ${requestId}, log ID: ${logResult.rows[0].id}`);
+      const logResult = await ExecutionLogRepository.create({
+        requestId,
+        success: executionResult.success,
+        output: this.formatOutput(executionResult),
+        error: executionResult.error || null,
+        executionTimeMs: executionResult.executionTime || 0
+      });
+      console.log(`Logged execution result for request ${requestId}, log ID: ${logResult.id}`);
     } catch (error) {
       console.error(`Failed to log execution for request ${requestId}:`, error.message);
     }
@@ -135,7 +147,6 @@ class PostgresExecutionService {
       return null;
     }
 
-    // Return structured output as JSON (consistent with script output)
     const result = {
       console_output: executionResult.rows && executionResult.rows.length > 0
         ? `Query executed successfully. ${executionResult.rowCount} rows returned.`
@@ -146,27 +157,17 @@ class PostgresExecutionService {
     return JSON.stringify(result, null, 2);
   }
 
-  // Get execution result for a request
   async getExecutionResult(requestId) {
     try {
-      const result = await query(
-        `SELECT el.*, qr.status 
-         FROM execution_logs el 
-         JOIN query_requests qr ON el.request_id = qr.id 
-         WHERE el.request_id = $1 
-         ORDER BY el.executed_at DESC 
-         LIMIT 1`,
-        [requestId]
-      );
+      const log = await ExecutionLogRepository.findLatestByRequestId(requestId);
 
-      if (result.rows.length === 0) {
+      if (!log) {
         return {
           status: 'pending',
           message: 'Request not yet executed'
         };
       }
 
-      const log = result.rows[0];
       return {
         status: log.success ? 'success' : 'failure',
         output: log.output,
@@ -180,7 +181,6 @@ class PostgresExecutionService {
     }
   }
 
-  // Execute multiple PostgreSQL queries (for batch processing)
   async executeMultipleQueries(requestIds) {
     const results = [];
     

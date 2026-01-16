@@ -5,7 +5,7 @@ const requestController = require("../controllers/request.controller");
 const approvalController = require("../controllers/approval.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
 const validate = require("../middlewares/validate.middleware");
-const { paginationSchema, reqIdParamSchema } = require("../validators/schemas");
+const { paginationSchema, reqIdParamSchema, submitRequestSchema } = require("../validators/schemas");
 const multer = require('multer');
 const path = require('path');
 
@@ -53,7 +53,35 @@ const smartUploadMiddleware = (req, res, next) => {
   });
 };
 
-router.post("/",authMiddleware,smartUploadMiddleware,requestController.submitRequest);
+// Validation middleware for submit request (after multer)
+const validateSubmitRequest = (req, res, next) => {
+  try {
+    // Convert instance_id to number if it's a string (from form-data)
+    if (req.body.instance_id) {
+      req.body.instance_id = parseInt(req.body.instance_id);
+    }
+    
+    // Validate using schema
+    submitRequestSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error.name === 'ZodError') {
+      const errors = error.issues.map(err => ({
+        field: err.path.join('.'),
+        message: err.message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: errors[0]?.message || 'Validation failed',
+        errors
+      });
+    }
+    next(error);
+  }
+};
+
+router.post("/", authMiddleware, smartUploadMiddleware, validateSubmitRequest, requestController.submitRequest);
 router.get("/mine",authMiddleware,validate({ query: paginationSchema }),requestController.getMyRequests);
 router.get("/:req_id/result",authMiddleware,validate({ params: reqIdParamSchema }),approvalController.getExecutionResult);
 

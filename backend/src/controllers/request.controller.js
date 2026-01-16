@@ -1,4 +1,5 @@
 const requestService = require("../services/request.service");
+const slackService = require("../services/slack.service");
 
 const submitRequest = async (req, res) => {
   const {
@@ -45,6 +46,25 @@ const submitRequest = async (req, res) => {
     });
   }
 
+  // Validate query is not just whitespace
+  if (hasQuery && queryText.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Query cannot be empty or contain only spaces"
+    });
+  }
+
+  // Validate script is not empty or just whitespace
+  if (hasScript) {
+    const scriptContent = scriptFile.buffer.toString('utf8');
+    if (scriptContent.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Script file cannot be empty or contain only spaces"
+      });
+    }
+  }
+
   try {
     const scriptContent = hasScript ? scriptFile.buffer.toString('utf8') : null;
     
@@ -57,6 +77,40 @@ const submitRequest = async (req, res) => {
       comments,
       podId: pod_id
     });
+
+    // Send Slack notification for new submission
+    if (slackService.isEnabled()) {
+      try {
+        // Fetch complete request data for notification
+        const requestData = await requestService.getRequestForNotification(createdRequest.id);
+        
+        if (requestData) {
+          // Get pod name from pod_id
+          const PODS = [
+            { id: 'pod-1', name: 'Pod 1' },
+            { id: 'de', name: 'DE' },
+            { id: 'db', name: 'DB' },
+          ];
+          const pod = PODS.find(p => p.id === pod_id);
+          const podName = pod ? pod.name : pod_id;
+
+          await slackService.notifyNewSubmission({
+            req_id: createdRequest.id,
+            requester_name: req.user.name,
+            requester_email: req.user.email,
+            database_type: requestData.database_type,
+            database_name: db_name,
+            instance_name: requestData.instance_name,
+            query: queryText,
+            script: scriptContent,
+            pod_name: podName
+          });
+        }
+      } catch (slackError) {
+        console.error('Slack notification failed:', slackError.message);
+        // Don't fail the request if Slack notification fails
+      }
+    }
 
     return res.status(201).json({
       success: true,

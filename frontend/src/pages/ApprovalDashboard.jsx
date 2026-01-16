@@ -7,7 +7,6 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OutputDisplay from '../components/common/OutputDisplay';
 import CodeEditor from '../components/common/CodeEditor';
-import Tooltip from '../components/common/Tooltip';
 import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
 
 export default function ApprovalDashboard() {
@@ -94,20 +93,30 @@ export default function ApprovalDashboard() {
         case 'database_name':
           return req.database_name?.toLowerCase().includes(searchLower);
         case 'query':
-          return req.query?.toLowerCase().includes(searchLower) || req.script?.toLowerCase().includes(searchLower);
+          return (req.query && req.query.toLowerCase().includes(searchLower)) || 
+                 (req.script && req.script.toLowerCase().includes(searchLower));
         case 'comments':
           return req.comments?.toLowerCase().includes(searchLower);
+        case 'risk': {
+          const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+          const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+          return riskLabel.includes(searchLower);
+        }
         case 'all':
-        default:
+        default: {
+          const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+          const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
           return (
             req.req_id?.toString().includes(debouncedSearch) ||
             req.requester_email?.toLowerCase().includes(searchLower) ||
             req.requester_name?.toLowerCase().includes(searchLower) ||
             req.database_name?.toLowerCase().includes(searchLower) ||
-            req.query?.toLowerCase().includes(searchLower) ||
-            req.script?.toLowerCase().includes(searchLower) ||
-            req.comments?.toLowerCase().includes(searchLower)
+            (req.query && req.query.toLowerCase().includes(searchLower)) ||
+            (req.script && req.script.toLowerCase().includes(searchLower)) ||
+            req.comments?.toLowerCase().includes(searchLower) ||
+            riskLabel.includes(searchLower)
           );
+        }
       }
     });
   }, [requests, debouncedSearch, searchField]);
@@ -247,6 +256,7 @@ export default function ApprovalDashboard() {
           <option value="database_name">Database</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
+          <option value="risk">Risk Level</option>
         </select>
         
         <input
@@ -284,6 +294,7 @@ export default function ApprovalDashboard() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requester</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Database</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -292,7 +303,7 @@ export default function ApprovalDashboard() {
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   No requests found
                 </td>
               </tr>
@@ -314,18 +325,16 @@ export default function ApprovalDashboard() {
                     <div className="text-xs text-gray-400">{request.instance_name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        request.query ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                      }`}>
-                        {request.query ? 'Query' : 'Script'}
-                      </span>
-                      <Tooltip content={getRiskLabel(riskAssessment.level)}>
-                        <span className={`text-xl ${riskAssessment.color}`}>
-                          {riskAssessment.icon}
-                        </span>
-                      </Tooltip>
-                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      request.query ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {request.query ? 'Query' : 'Script'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskAssessment.bgColor} ${riskAssessment.color}`}>
+                      {getRiskLabel(riskAssessment.level)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={request.status} />
@@ -380,17 +389,30 @@ export default function ApprovalDashboard() {
               >
                 Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 border rounded text-sm ${
-                    currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                // Show first page, last page, current page, and pages around current
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 border rounded text-sm ${
+                      currentPage === pageNum ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}

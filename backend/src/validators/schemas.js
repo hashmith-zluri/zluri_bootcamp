@@ -11,7 +11,11 @@ const submitRequestSchema = z.object({
   instance_id: z.number({ required_error: 'instance_id is required' }).int().positive(),
   db_name: z.string().min(1, 'db_name is required'),
   query: z.string().optional(),
-  comments: z.string().min(1, 'comments is required'),
+  comments: z.string()
+    .min(1, 'comments is required')
+    .refine(val => val.trim().length > 0, {
+      message: 'comments cannot be empty or contain only spaces'
+    }),
   pod_id: z.union([z.string(), z.number()]).transform(val => String(val))
 });
 

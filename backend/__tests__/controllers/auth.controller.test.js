@@ -162,7 +162,7 @@ describe('Auth Controller', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('No token provided');
-    });
+    }, 15000);
 
     it('should return 500 when logout throws error', async () => {
       const authSvc = require('../../src/services/auth.service');

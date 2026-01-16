@@ -14,7 +14,11 @@ export const querySubmissionSchema = z.object({
   requestType: z.enum(['query', 'script'], { required_error: 'Request type is required' }),
   query: z.string().optional(),
   script: z.string().optional(),
-  comments: z.string().min(1, 'Comments are required'),
+  comments: z.string()
+    .min(1, 'Comments are required')
+    .refine((val) => val.trim().length > 0, {
+      message: 'Comments cannot be empty or contain only spaces',
+    }),
   podId: z.string().min(1, 'Pod is required'),
 }).refine((data) => {
   if (data.requestType === 'query') {
@@ -23,7 +27,7 @@ export const querySubmissionSchema = z.object({
   // For script requests, file validation is handled separately in the component
   return true;
 }, {
-  message: 'Query is required when request type is Query',
+  message: 'Query cannot be empty or contain only spaces',
   path: ['query'],
 });
 

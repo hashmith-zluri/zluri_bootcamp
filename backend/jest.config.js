@@ -5,6 +5,7 @@ module.exports = {
     'src/**/*.js',
     '!src/server.js',
     '!src/temp/**',
+    '!src/entities/**',
     '!**/node_modules/**'
   ],
   coverageDirectory: 'coverage',

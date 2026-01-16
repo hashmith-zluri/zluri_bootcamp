@@ -6,7 +6,6 @@ import Modal from '../components/common/Modal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OutputDisplay from '../components/common/OutputDisplay';
 import CodeEditor from '../components/common/CodeEditor';
-import Tooltip from '../components/common/Tooltip';
 import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
 import { PODS } from '../utils/constants';
 
@@ -64,6 +63,11 @@ export default function MySubmissions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  const getPodName = (podId) => {
+    const pod = PODS.find(p => p.id === podId);
+    return pod ? pod.name : podId || 'N/A';
+  };
+
   const filteredRequests = requests; // Already filtered by backend
 
   // Client-side search
@@ -82,20 +86,30 @@ export default function MySubmissions() {
       case 'pod':
         return getPodName(req.pod_id)?.toLowerCase().includes(searchLower);
       case 'query':
-        return req.query?.toLowerCase().includes(searchLower) || req.script?.toLowerCase().includes(searchLower);
+        return (req.query && req.query.toLowerCase().includes(searchLower)) || 
+               (req.script && req.script.toLowerCase().includes(searchLower));
       case 'comments':
         return req.comments?.toLowerCase().includes(searchLower);
+      case 'risk': {
+        const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+        const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+        return riskLabel.includes(searchLower);
+      }
       case 'all':
-      default:
+      default: {
+        const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+        const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
         return (
           req.req_id?.toString().includes(searchTerm) ||
           req.database_name?.toLowerCase().includes(searchLower) ||
           req.instance_name?.toLowerCase().includes(searchLower) ||
           getPodName(req.pod_id)?.toLowerCase().includes(searchLower) ||
-          req.query?.toLowerCase().includes(searchLower) ||
-          req.script?.toLowerCase().includes(searchLower) ||
-          req.comments?.toLowerCase().includes(searchLower)
+          (req.query && req.query.toLowerCase().includes(searchLower)) ||
+          (req.script && req.script.toLowerCase().includes(searchLower)) ||
+          req.comments?.toLowerCase().includes(searchLower) ||
+          riskLabel.includes(searchLower)
         );
+      }
     }
   });
 
@@ -132,11 +146,6 @@ export default function MySubmissions() {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
-  };
-
-  const getPodName = (podId) => {
-    const pod = PODS.find(p => p.id === podId);
-    return pod ? pod.name : podId || 'N/A';
   };
 
   if (loading) {
@@ -191,6 +200,7 @@ export default function MySubmissions() {
           <option value="pod">Pod</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
+          <option value="risk">Risk Level</option>
         </select>
         
         <input
@@ -231,6 +241,7 @@ export default function MySubmissions() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Database</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pod</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -239,34 +250,25 @@ export default function MySubmissions() {
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   {loading ? 'Loading...' : 'No requests found'}
                 </td>
               </tr>
             ) : (
-              paginatedRequests.map(request => (
+              paginatedRequests.map(request => {
+                const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
+                
+                return (
                 <tr key={request.req_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     #{request.req_id}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        request.query ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                      }`}>
-                        {request.query ? 'Query' : 'Script'}
-                      </span>
-                      {(() => {
-                        const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
-                        return (
-                          <Tooltip content={getRiskLabel(riskAssessment.level)}>
-                            <span className={`text-xl ${riskAssessment.color}`}>
-                              {riskAssessment.icon}
-                            </span>
-                          </Tooltip>
-                        );
-                      })()}
-                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      request.query ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {request.query ? 'Query' : 'Script'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div>{request.database_name}</div>
@@ -274,6 +276,11 @@ export default function MySubmissions() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getPodName(request.pod_id)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskAssessment.bgColor} ${riskAssessment.color}`}>
+                      {getRiskLabel(riskAssessment.level)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={request.status} />
@@ -300,7 +307,8 @@ export default function MySubmissions() {
                     </div>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

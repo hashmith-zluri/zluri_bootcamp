@@ -51,12 +51,7 @@ describe('DB Controller', () => {
         ]
       });
       expect(query).toHaveBeenCalledWith(
-        `
-    SELECT id, name 
-    FROM db_instances 
-    WHERE engine = $1 
-    ORDER BY name
-  `,
+        'SELECT id, name FROM db_instances WHERE engine = $1 ORDER BY name',
         ['POSTGRES']
       );
     });

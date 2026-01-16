@@ -2,26 +2,19 @@ const postgresExecutionService = require('./postgres.service');
 const mongoExecutionService = require('./mongo.service');
 const postgresScriptExecutionService = require('./postgresScript.service');
 const mongoScriptExecutionService = require('./mongoScript.service');
-const { query } = require('../config/db');
+const QueryRequestRepository = require('../repositories/queryRequest.repository');
+const ExecutionLogRepository = require('../repositories/executionLog.repository');
 
 class ExecutionService {
   async executeQuery(requestId) {
     try {
-      const result = await query(
-        `
-        SELECT di.engine, qr.query_text, qr.script_path
-        FROM query_requests qr
-        JOIN db_instances di ON qr.db_instance_id = di.id
-        WHERE qr.id = $1
-        `,
-        [requestId]
-      );
+      const request = await QueryRequestRepository.findWithEngine(requestId);
 
-      if (result.rows.length === 0) {
+      if (!request) {
         throw new Error(`Request ${requestId} not found`);
       }
 
-      const { engine, query_text, script_path } = result.rows[0];
+      const { engine, query_text, script_path } = request;
 
       const hasQuery = Boolean(query_text);
       const hasScript = Boolean(script_path);
@@ -32,16 +25,12 @@ class ExecutionService {
 
       const executors = {
         QUERY: {
-          POSTGRES: () =>
-            postgresExecutionService.executePostgresQuery(requestId),
-          MONGO: () =>
-            mongoExecutionService.executeMongoQuery(requestId)
+          POSTGRES: () => postgresExecutionService.executePostgresQuery(requestId),
+          MONGO: () => mongoExecutionService.executeMongoQuery(requestId)
         },
         SCRIPT: {
-          POSTGRES: () =>
-            postgresScriptExecutionService.executePostgresScript(requestId),
-          MONGO: () =>
-            mongoScriptExecutionService.executeMongoScript(requestId)
+          POSTGRES: () => postgresScriptExecutionService.executePostgresScript(requestId),
+          MONGO: () => mongoScriptExecutionService.executeMongoScript(requestId)
         }
       };
 
@@ -49,17 +38,12 @@ class ExecutionService {
       const executor = executors[type]?.[engine];
 
       if (!executor) {
-        throw new Error(
-          `${type} execution not supported for engine: ${engine}`
-        );
+        throw new Error(`${type} execution not supported for engine: ${engine}`);
       }
 
       return await executor();
     } catch (error) {
-      console.error(
-        `Execution failed for request ${requestId}:`,
-        error.message
-      );
+      console.error(`Execution failed for request ${requestId}:`, error.message);
       throw error;
     }
   }
@@ -67,47 +51,38 @@ class ExecutionService {
   async executePostgresQuery(requestId) {
     return postgresExecutionService.executePostgresQuery(requestId);
   }
+
   async executeMongoQuery(requestId) {
     return mongoExecutionService.executeMongoQuery(requestId);
   }
+
   async executePostgresScript(requestId) {
     return postgresScriptExecutionService.executePostgresScript(requestId);
   }
+
   async executeMongoScript(requestId) {
     return mongoScriptExecutionService.executeMongoScript(requestId);
   }
 
   async getExecutionResult(requestId) {
     try {
-      const result = await query(
-        `
-        SELECT di.engine, qr.query_text, qr.script_path
-        FROM query_requests qr
-        JOIN db_instances di ON qr.db_instance_id = di.id
-        WHERE qr.id = $1
-        `,
-        [requestId]
-      );
+      const request = await QueryRequestRepository.findWithEngine(requestId);
 
-      if (result.rows.length === 0) {
+      if (!request) {
         throw new Error(`Request ${requestId} not found`);
       }
 
-      const { engine, query_text, script_path } = result.rows[0];
+      const { engine, script_path } = request;
       const hasScript = Boolean(script_path);
 
       const resultFetchers = {
         QUERY: {
-          POSTGRES: () =>
-            postgresExecutionService.getExecutionResult(requestId),
-          MONGO: () =>
-            mongoExecutionService.getExecutionResult(requestId)
+          POSTGRES: () => postgresExecutionService.getExecutionResult(requestId),
+          MONGO: () => mongoExecutionService.getExecutionResult(requestId)
         },
         SCRIPT: {
-          POSTGRES: () =>
-            postgresScriptExecutionService.getScriptExecutionResult(requestId),
-          MONGO: () =>
-            mongoScriptExecutionService.getScriptExecutionResult(requestId)
+          POSTGRES: () => postgresScriptExecutionService.getScriptExecutionResult(requestId),
+          MONGO: () => mongoScriptExecutionService.getScriptExecutionResult(requestId)
         }
       };
 
@@ -115,17 +90,12 @@ class ExecutionService {
       const fetcher = resultFetchers[type]?.[engine];
 
       if (!fetcher) {
-        throw new Error(
-          `Result fetch not supported for ${type} on engine ${engine}`
-        );
+        throw new Error(`Result fetch not supported for ${type} on engine ${engine}`);
       }
 
       return await fetcher();
     } catch (error) {
-      console.error(
-        `Failed to get execution result for request ${requestId}:`,
-        error.message
-      );
+      console.error(`Failed to get execution result for request ${requestId}:`, error.message);
       throw error;
     }
   }
@@ -144,10 +114,8 @@ class ExecutionService {
         });
       }
     }
-
     return results;
   }
-
 
   async executePostgresBatch(requestIds) {
     return postgresExecutionService.executeMultipleQueries(requestIds);
@@ -157,13 +125,9 @@ class ExecutionService {
     return mongoExecutionService.executeMultipleQueries(requestIds);
   }
 
-  // Update request status in database
   async updateRequestStatus(requestId, status) {
     try {
-      await query(
-        'UPDATE query_requests SET status = $1 WHERE id = $2',
-        [status, requestId]
-      );
+      await QueryRequestRepository.updateStatus(requestId, status);
       console.log(`Updated request ${requestId} status to ${status}`);
     } catch (error) {
       console.error(`Failed to update request ${requestId} status:`, error.message);
@@ -171,24 +135,16 @@ class ExecutionService {
     }
   }
 
-  // Log execution result to execution_logs table
   async logExecution(requestId, executionResult) {
     try {
-      const logResult = await query(
-        `INSERT INTO execution_logs 
-         (request_id, success, output, error, execution_time_ms) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id`,
-        [
-          requestId,
-          executionResult.success,
-          this.formatOutput(executionResult),
-          executionResult.error || null,
-          executionResult.executionTime || 0
-        ]
-      );
-      
-      console.log(`Logged execution result for request ${requestId}, log ID: ${logResult.rows[0].id}`);
+      const logResult = await ExecutionLogRepository.create({
+        requestId,
+        success: executionResult.success,
+        output: this.formatOutput(executionResult),
+        error: executionResult.error || null,
+        executionTimeMs: executionResult.executionTime || 0
+      });
+      console.log(`Logged execution result for request ${requestId}, log ID: ${logResult.id}`);
     } catch (error) {
       console.error(`Failed to log execution for request ${requestId}:`, error.message);
     }

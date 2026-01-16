@@ -1,19 +1,13 @@
-const { query } = require("../config/db");
+const DbInstanceRepository = require("../repositories/dbInstance.repository");
+const InstanceDatabaseRepository = require("../repositories/instanceDatabase.repository");
+
 /**
  * Get database instances by engine type
  * @param {string} engineType - Database engine type (POSTGRES or MONGO)
  * @returns {Promise<Object[]>} Array of database instances
  */
 const getInstancesByType = async (engineType) => {
-  const sql = `
-    SELECT id, name 
-    FROM db_instances 
-    WHERE engine = $1 
-    ORDER BY name
-  `;
-  
-  const result = await query(sql, [engineType.toUpperCase()]);
-  return result.rows;
+  return await DbInstanceRepository.findByEngine(engineType);
 };
 
 /**
@@ -22,14 +16,7 @@ const getInstancesByType = async (engineType) => {
  * @returns {Promise<Object|null>} Instance details or null if not found
  */
 const getInstanceById = async (instanceId) => {
-  const sql = `
-    SELECT name, host, port, engine 
-    FROM db_instances 
-    WHERE id = $1
-  `;
-  
-  const result = await query(sql, [instanceId]);
-  return result.rows.length > 0 ? result.rows[0] : null;
+  return await DbInstanceRepository.findDetailsById(instanceId);
 };
 
 /**
@@ -38,15 +25,7 @@ const getInstanceById = async (instanceId) => {
  * @returns {Promise<string[]>} Array of database names
  */
 const getDatabasesByInstanceId = async (instanceId) => {
-  const sql = `
-    SELECT database_name 
-    FROM instance_databases 
-    WHERE instance_id = $1 
-    ORDER BY database_name
-  `;
-  
-  const result = await query(sql, [instanceId]);
-  return result.rows.map(row => row.database_name);
+  return await InstanceDatabaseRepository.findByInstanceId(instanceId);
 };
 
 module.exports = {

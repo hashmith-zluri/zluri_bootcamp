@@ -11,7 +11,9 @@ CREATE TABLE db_instances (
   name VARCHAR(100) NOT NULL,
   host VARCHAR(255) NOT NULL,
   port INT NOT NULL,
-  engine VARCHAR(20) CHECK (engine IN ('POSTGRES', 'MONGO')) NOT NULL
+  engine VARCHAR(20) CHECK (engine IN ('POSTGRES', 'MONGO')) NOT NULL,
+  username VARCHAR(255),
+  password VARCHAR(255)
 );
 
 CREATE TABLE query_requests (

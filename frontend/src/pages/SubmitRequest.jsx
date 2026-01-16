@@ -514,7 +514,6 @@ yourFunction();`}
                       <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
                     </p>
                     <p className="text-xs text-gray-500">JavaScript files only (.js)</p>
-                    <p className="text-xs text-red-500 mt-1">File must contain code (cannot be empty)</p>
                   </div>
                 </label>
                 {selectedFile && (
