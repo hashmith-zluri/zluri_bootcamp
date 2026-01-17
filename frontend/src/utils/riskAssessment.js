@@ -1,4 +1,166 @@
 /**
+ * Remove SQL comments from content
+ * @param {string} content - Content to clean
+ * @returns {string} - Content without SQL comments
+ */
+const removeSqlComments = (content) => {
+  if (!content) return '';
+  
+  let result = '';
+  let i = 0;
+  let inString = false;
+  let stringChar = '';
+  let inBlockComment = false;
+  
+  while (i < content.length) {
+    const char = content[i];
+    const nextChar = content[i + 1];
+    
+    // Handle string literals (preserve content inside strings)
+    if (!inBlockComment && (char === '"' || char === "'" || char === '`')) {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+        result += char;
+      } else if (char === stringChar && content[i - 1] !== '\\') {
+        inString = false;
+        stringChar = '';
+        result += char;
+      } else {
+        result += char;
+      }
+      i++;
+      continue;
+    }
+    
+    // Skip processing if we're inside a string
+    if (inString) {
+      result += char;
+      i++;
+      continue;
+    }
+    
+    // Handle block comments /* */
+    if (!inBlockComment && char === '/' && nextChar === '*') {
+      inBlockComment = true;
+      i += 2;
+      continue;
+    }
+    
+    if (inBlockComment && char === '*' && nextChar === '/') {
+      inBlockComment = false;
+      i += 2;
+      continue;
+    }
+    
+    if (inBlockComment) {
+      i++;
+      continue;
+    }
+    
+    // Handle line comments --
+    if (char === '-' && nextChar === '-') {
+      // Skip to end of line
+      while (i < content.length && content[i] !== '\n') {
+        i++;
+      }
+      // Keep the newline
+      if (i < content.length) {
+        result += content[i];
+        i++;
+      }
+      continue;
+    }
+    
+    result += char;
+    i++;
+  }
+  
+  return result;
+};
+
+/**
+ * Remove JavaScript comments from content
+ * @param {string} content - Content to clean
+ * @returns {string} - Content without JavaScript comments
+ */
+const removeJsComments = (content) => {
+  if (!content) return '';
+  
+  let result = '';
+  let i = 0;
+  let inString = false;
+  let stringChar = '';
+  let inBlockComment = false;
+  
+  while (i < content.length) {
+    const char = content[i];
+    const nextChar = content[i + 1];
+    
+    // Handle string literals (preserve content inside strings)
+    if (!inBlockComment && (char === '"' || char === "'" || char === '`')) {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+        result += char;
+      } else if (char === stringChar && content[i - 1] !== '\\') {
+        inString = false;
+        stringChar = '';
+        result += char;
+      } else {
+        result += char;
+      }
+      i++;
+      continue;
+    }
+    
+    // Skip processing if we're inside a string
+    if (inString) {
+      result += char;
+      i++;
+      continue;
+    }
+    
+    // Handle block comments /* */
+    if (!inBlockComment && char === '/' && nextChar === '*') {
+      inBlockComment = true;
+      i += 2;
+      continue;
+    }
+    
+    if (inBlockComment && char === '*' && nextChar === '/') {
+      inBlockComment = false;
+      i += 2;
+      continue;
+    }
+    
+    if (inBlockComment) {
+      i++;
+      continue;
+    }
+    
+    // Handle line comments //
+    if (char === '/' && nextChar === '/') {
+      // Skip to end of line
+      while (i < content.length && content[i] !== '\n') {
+        i++;
+      }
+      // Keep the newline
+      if (i < content.length) {
+        result += content[i];
+        i++;
+      }
+      continue;
+    }
+    
+    result += char;
+    i++;
+  }
+  
+  return result;
+};
+
+/**
  * Assess the risk level of a database query or script
  * @param {string} query - SQL query text
  * @param {string} script - Script content
@@ -6,7 +168,19 @@
  * @returns {Object} - { level: 'low'|'medium'|'high', reasons: string[], color: string }
  */
 export const assessQueryRisk = (query, script, dbType) => {
-  const content = (query || script || '').toUpperCase();
+  let rawContent = query || script || '';
+  
+  // Remove comments based on content type
+  let cleanContent = rawContent;
+  if (script) {
+    // For scripts, remove JavaScript comments
+    cleanContent = removeJsComments(rawContent);
+  } else if (query) {
+    // For queries, remove SQL comments
+    cleanContent = removeSqlComments(rawContent);
+  }
+  
+  const content = cleanContent.toUpperCase();
   const reasons = [];
   let riskScore = 0;
 
