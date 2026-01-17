@@ -6,9 +6,16 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "start:prod": "NODE_ENV=production node src/server.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:verbose": "jest --coverage --verbose"
+    "test:verbose": "jest --coverage --verbose",
+    "migrate": "npx mikro-orm migration:create",
+    "migrate:up": "npx mikro-orm migration:up",
+    "migrate:down": "npx mikro-orm migration:down",
+    "schema:create": "npx mikro-orm schema:create",
+    "schema:update": "npx mikro-orm schema:update",
+    "schema:drop": "npx mikro-orm schema:drop"
   },
   "keywords": [],
   "author": "",

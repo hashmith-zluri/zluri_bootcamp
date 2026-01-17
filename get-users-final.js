@@ -27,4 +27,4 @@ async function getAllUsers() {
   }
 }
 
-getAllUsers();
+await getAllUsers();

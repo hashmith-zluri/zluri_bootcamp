@@ -91,13 +91,13 @@ describe('Approval Service', () => {
   describe('getApprovalRequestsByPods - Sorting', () => {
     const managedPods = ['pod1', 'pod2'];
 
-    it('should sort by created_at DESC (default)', async () => {
+    it('should sort by id DESC (default)', async () => {
       query.mockResolvedValueOnce({ rows: Array(10).fill({ reqid: 1 }) });
 
       await approvalService.getApprovalRequestsByPods(managedPods);
 
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY qr.created_at DESC'),
+        expect.stringContaining('ORDER BY qr.id DESC'),
         expect.any(Array)
       );
     });
@@ -120,9 +120,9 @@ describe('Approval Service', () => {
 
       await approvalService.getApprovalRequestsByPods(managedPods, { sortBy: 'invalid_field' });
 
-      // Should default to created_at
+      // Should default to id
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY qr.created_at DESC'),
+        expect.stringContaining('ORDER BY qr.id DESC'),
         expect.any(Array)
       );
     });

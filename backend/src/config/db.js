@@ -23,8 +23,21 @@ const initORM = async () => {
       port: parseInt(process.env.DB_PORT) || 5432,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
+      
+      // SSL configuration for Neon (REQUIRED)
+      driverOptions: {
+        connection: {
+          ssl: {
+            rejectUnauthorized: false
+          }
+        }
+      },
+      
       debug: process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test',
-      pool: { min: 2, max: 10 },
+      pool: { 
+        min: 0, // Start with 0 connections for serverless
+        max: 5  // Reduced max connections for Neon free tier
+      },
       allowGlobalContext: true
     });
     console.log('MikroORM initialized successfully');

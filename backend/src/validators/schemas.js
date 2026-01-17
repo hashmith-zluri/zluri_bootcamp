@@ -42,7 +42,7 @@ const paginationSchema = z.object({
       message: 'Offset must be +ve integer.' 
     }),
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED', 'EXECUTING']).optional(),
-  sortBy: z.enum(['created_at', 'status', 'database_name', 'approved_at']).optional()
+  sortBy: z.enum(['created_at', 'status', 'database_name', 'approved_at', 'id']).optional()
 });
 
 // DB type query schema

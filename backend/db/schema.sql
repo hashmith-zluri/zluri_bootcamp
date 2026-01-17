@@ -64,12 +64,17 @@ INSERT INTO users (email, name, password, role) VALUES
 ('db-admin@zluri.com', 'DB', '$2b$10$q0tGMhXNVpqDYKuZfsIIi./26h4/7jVTentIovS/DRxOzyNgSuRyG', 'MANAGER'), -- password: pass6
 ('admin@zluri.com', 'Admin', '$2b$10$qRxJ2OqqPvanVsfTsYS1EOq6hC10vwTvruE8ak8fFv43..h.UhJN6', 'ADMIN'); -- password: pass7
 
-INSERT INTO db_instances (name, host, port, engine) VALUES
-('local-postgres', 'localhost', 5432, 'POSTGRES'),
-('local-mongo', 'localhost', 27017, 'MONGO');
+INSERT INTO db_instances (name, host, port, engine, username, password) VALUES
+('postgres-1', 'ep-little-sound-ahuc250q-pooler.c-3.us-east-1.aws.neon.tech', 5432, 'POSTGRES', 'neondb_owner', 'npg_pVcCRqNK7zM8'),
+('postgres-2', 'ep-bold-frog-ahjzgmj9-pooler.c-3.us-east-1.aws.neon.tech', 5432, 'POSTGRES', 'neondb_owner', 'npg_ox0ZUA1feQWM'),
+('local-mongo', 'localhost', 27017, 'MONGO', NULL, NULL);
 
 INSERT INTO instance_databases (instance_id, database_name, description) VALUES
-(1, 'test_ecommerce', 'E-commerce application database with users, products, orders'),
-(1, 'test_analytics', 'Analytics database with page views, events, user sessions'),
-(1, 'test_inventory', 'Inventory management database with products, stock movements'),
-(2, 'test_mongo', 'MongoDB test database with analytics');
+-- postgres-1 databases (instance_id = 1)
+(1, 'test_analytics', 'Analytics database for reporting and metrics'),
+(1, 'test_ecommerce', 'E-commerce application database'),
+(1, 'zluri_portal', 'Main portal database'),
+-- postgres-2 databases (instance_id = 2)
+(2, 'test_inventory', 'Inventory management database'),
+-- local-mongo databases (instance_id = 3)
+(3, 'test_mongo', 'MongoDB test database with analytics');

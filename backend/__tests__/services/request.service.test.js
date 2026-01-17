@@ -238,13 +238,13 @@ describe('Request Service', () => {
   });
 
   describe('getUserRequests - Sorting', () => {
-    it('should sort by created_at DESC (default)', async () => {
+    it('should sort by id DESC (default)', async () => {
       query.mockResolvedValueOnce({ rows: Array(10).fill({ reqid: 1 }) });
 
       await requestService.getUserRequests(1);
 
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY qr.created_at DESC'),
+        expect.stringContaining('ORDER BY qr.id DESC'),
         expect.any(Array)
       );
     });
@@ -276,9 +276,9 @@ describe('Request Service', () => {
 
       await requestService.getUserRequests(1, { sortBy: 'invalid_field' });
 
-      // Should default to created_at
+      // Should default to id
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY qr.created_at DESC'),
+        expect.stringContaining('ORDER BY qr.id DESC'),
         expect.any(Array)
       );
     });

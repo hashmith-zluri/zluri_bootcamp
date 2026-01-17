@@ -151,11 +151,11 @@ class QueryRequestRepository {
    * @returns {Promise<Array>}
    */
   async findByUserId(userId, options = {}) {
-    const { status = null, sortBy = 'created_at', limit = null, offset = null } = options;
+    const { status = null, sortBy = 'id', limit = null, offset = null } = options;
     
-    const validSortFields = ['created_at', 'status', 'database_name', 'approved_at'];
+    const validSortFields = ['created_at', 'status', 'database_name', 'approved_at', 'id'];
     const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED', 'EXECUTING'];
-    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'id';
 
     const params = [userId];
     let whereClause = 'qr.requester_id = $1';
@@ -196,11 +196,11 @@ class QueryRequestRepository {
    * @returns {Promise<Array>}
    */
   async findByPods(managedPods, options = {}) {
-    const { status = null, sortBy = 'created_at', limit = null, offset = null } = options;
+    const { status = null, sortBy = 'id', limit = null, offset = null } = options;
     
-    const validSortFields = ['created_at', 'status', 'database_name', 'approved_at'];
+    const validSortFields = ['created_at', 'status', 'database_name', 'approved_at', 'id'];
     const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED', 'EXECUTING'];
-    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'id';
 
     const params = [managedPods];
     let whereClause = 'qr.pod_id = ANY($1)';

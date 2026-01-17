@@ -16,6 +16,14 @@ const createTargetDbConnection = (instanceConfig) => {
     connectionTimeoutMillis: 10000, 
   };
 
+  // Add SSL configuration for Neon databases (identified by .neon.tech in hostname)
+  if (host && host.includes('.neon.tech')) {
+    config.ssl = {
+      rejectUnauthorized: false
+    };
+    console.log(`SSL enabled for Neon database: ${host}`);
+  }
+
   return new Pool(config);
 };
 

@@ -352,7 +352,11 @@ class PostgresScriptExecutionService {
                 user: instance.username || process.env.DB_USER,
                 password: instance.password || process.env.DB_PASSWORD,
                 connectionTimeoutMillis: 30000,
-                query_timeout: 30000
+                query_timeout: 30000,
+                // Add SSL configuration for Neon databases
+                ...(instance.host && instance.host.includes('.neon.tech') ? {
+                  ssl: { rejectUnauthorized: false }
+                } : {})
               },
               env: {
                 DB_CONFIG_FILE: JSON.stringify({
