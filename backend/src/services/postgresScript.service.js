@@ -202,6 +202,11 @@ class PostgresScriptExecutionService {
                   params: params.length > 0 ? params : undefined,
                   error: error.message
                 });
+                
+                // Mark that we had a database error - this should fail the execution
+                global.__hasDbError = true;
+                global.__dbErrorMessage = error.message;
+                
                 throw error;
               }
             };
@@ -224,18 +229,68 @@ class PostgresScriptExecutionService {
             
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            parentPort.postMessage({
-              success: true,
-              output: userOutput.trim(),
-              metadata: {
-                database: workerData.dbConfig.database,
-                host: workerData.dbConfig.host,
-                port: workerData.dbConfig.port,
-                queries_executed: queryCount,
-                executed_at: new Date().toISOString()
-              },
-              queries: queryDetails
-            });
+            // Check if any database errors occurred during execution
+            if (global.__hasDbError) {
+              parentPort.postMessage({
+                success: false,
+                error: global.__dbErrorMessage,
+                output: userOutput.trim(),
+                metadata: {
+                  database: workerData.dbConfig.database,
+                  host: workerData.dbConfig.host,
+                  port: workerData.dbConfig.port,
+                  queries_executed: queryCount,
+                  executed_at: new Date().toISOString()
+                },
+                queries: queryDetails
+              });
+            } else {
+              // Check if the output contains error messages indicating failure
+              const outputLower = userOutput.toLowerCase();
+              const hasErrorInOutput = outputLower.includes('failed to') || 
+                                     outputLower.includes('error:') || 
+                                     outputLower.includes('is not defined') ||
+                                     outputLower.includes('cannot read') ||
+                                     outputLower.includes('undefined');
+              
+              if (hasErrorInOutput) {
+                // Extract error message from output
+                const lines = userOutput.split('\\n');
+                const errorLine = lines.find(line => 
+                  line.toLowerCase().includes('failed to') || 
+                  line.toLowerCase().includes('is not defined') ||
+                  line.toLowerCase().includes('cannot read') ||
+                  line.toLowerCase().includes('undefined')
+                );
+                
+                parentPort.postMessage({
+                  success: false,
+                  error: errorLine || 'Script execution failed',
+                  output: userOutput.trim(),
+                  metadata: {
+                    database: workerData.dbConfig.database,
+                    host: workerData.dbConfig.host,
+                    port: workerData.dbConfig.port,
+                    queries_executed: queryCount,
+                    executed_at: new Date().toISOString()
+                  },
+                  queries: queryDetails
+                });
+              } else {
+                parentPort.postMessage({
+                  success: true,
+                  output: userOutput.trim(),
+                  metadata: {
+                    database: workerData.dbConfig.database,
+                    host: workerData.dbConfig.host,
+                    port: workerData.dbConfig.port,
+                    queries_executed: queryCount,
+                    executed_at: new Date().toISOString()
+                  },
+                  queries: queryDetails
+                });
+              }
+            }
             
           } catch (error) {
             parentPort.postMessage({

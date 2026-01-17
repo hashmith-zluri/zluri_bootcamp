@@ -1,75 +1,116 @@
 const requestService = require("../services/request.service");
 const slackService = require("../services/slack.service");
 
-const submitRequest = async (req, res) => {
-  const {
-    instance_id,
-    db_name,
-    query: queryText,
-    comments,
-    pod_id
-  } = req.body || {};
-
+// Validation helpers
+const validateRequiredFields = (req) => {
+  const { instance_id, db_name, comments, pod_id } = req.body || {};
   const userId = req.user?.id;
-  const scriptFile = req.file;
+  
+  const requiredFields = [
+    { key: "instance_id", value: instance_id, condition: instance_id !== undefined },
+    { key: "db_name", value: db_name },
+    { key: "comments", value: comments },
+    { key: "pod_id", value: pod_id },
+    { key: "userId", value: userId }
+  ];
+  
+  return requiredFields
+    .filter(field => !field.condition && !field.value)
+    .map(field => field.key);
+};
 
-  const miss = [];
-
-  if (instance_id === undefined) miss.push("instance_id");
-  if (!db_name) miss.push("db_name");
-  if (!comments) miss.push("comments");
-  if (!pod_id) miss.push("pod_id");
-  if (!userId) miss.push("userId");
-
-  if (miss.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields",
-      missing_fields: miss
-    });
-  }
-
+const validateRequestContent = (queryText, scriptFile) => {
   const hasQuery = Boolean(queryText);
   const hasScript = Boolean(scriptFile && scriptFile.buffer);
-
-  if (!hasQuery && !hasScript) {
-    return res.status(400).json({
-      success: false,
+  
+  const validationRules = [
+    {
+      condition: !hasQuery && !hasScript,
       message: "Either query or script file must be provided"
-    });
-  }
-
-  if (hasQuery && hasScript) {
-    return res.status(400).json({
-      success: false,
+    },
+    {
+      condition: hasQuery && hasScript,
       message: "Provide either query or script file, not both"
-    });
-  }
-
-  // Validate query is not just whitespace
-  if (hasQuery && queryText.trim().length === 0) {
-    return res.status(400).json({
-      success: false,
+    },
+    {
+      condition: hasQuery && queryText.trim().length === 0,
       message: "Query cannot be empty or contain only spaces"
+    },
+    {
+      condition: hasScript && scriptFile.buffer.toString('utf8').trim().length === 0,
+      message: "Script file cannot be empty or contain only spaces"
+    }
+  ];
+  
+  const failedRule = validationRules.find(rule => rule.condition);
+  return failedRule ? { error: failedRule.message } : { hasQuery, hasScript };
+};
+
+const createErrorResponse = (res, status, message, extraData = {}) => {
+  return res.status(status).json({
+    success: false,
+    message,
+    ...extraData
+  });
+};
+
+const sendSlackNotification = async (createdRequest, user, requestData) => {
+  if (!slackService.isEnabled()) return;
+
+  try {
+    const requestForNotification = await requestService.getRequestForNotification(createdRequest.id);
+    if (!requestForNotification) return;
+
+    const PODS = [
+      { id: 'pod-1', name: 'Pod 1' },
+      { id: 'de', name: 'DE' },
+      { id: 'db', name: 'DB' },
+    ];
+    
+    const pod = PODS.find(p => p.id === requestData.pod_id);
+    const podName = pod ? pod.name : requestData.pod_id;
+
+    await slackService.notifyNewSubmission({
+      req_id: createdRequest.id,
+      requester_name: user.name,
+      requester_email: user.email,
+      database_type: requestForNotification.database_type,
+      database_name: requestData.db_name,
+      instance_name: requestForNotification.instance_name,
+      query: requestData.queryText,
+      script: requestData.scriptContent,
+      pod_name: podName
+    });
+  } catch (slackError) {
+    console.error('Slack notification failed:', slackError.message);
+  }
+};
+
+const submitRequest = async (req, res) => {
+  const { instance_id, db_name, query: queryText, comments, pod_id } = req.body || {};
+  const scriptFile = req.file;
+
+  // Validate required fields
+  const missingFields = validateRequiredFields(req);
+  if (missingFields.length > 0) {
+    return createErrorResponse(res, 400, "Missing required fields", {
+      missing_fields: missingFields
     });
   }
 
-  // Validate script is not empty or just whitespace
-  if (hasScript) {
-    const scriptContent = scriptFile.buffer.toString('utf8');
-    if (scriptContent.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Script file cannot be empty or contain only spaces"
-      });
-    }
+  // Validate request content
+  const contentValidation = validateRequestContent(queryText, scriptFile);
+  if (contentValidation.error) {
+    return createErrorResponse(res, 400, contentValidation.error);
   }
+
+  const { hasQuery, hasScript } = contentValidation;
 
   try {
     const scriptContent = hasScript ? scriptFile.buffer.toString('utf8') : null;
     
     const createdRequest = await requestService.createRequest({
-      userId,
+      userId: req.user.id,
       instanceId: instance_id,
       dbName: db_name,
       queryText: hasQuery ? queryText : null,
@@ -78,39 +119,13 @@ const submitRequest = async (req, res) => {
       podId: pod_id
     });
 
-    // Send Slack notification for new submission
-    if (slackService.isEnabled()) {
-      try {
-        // Fetch complete request data for notification
-        const requestData = await requestService.getRequestForNotification(createdRequest.id);
-        
-        if (requestData) {
-          // Get pod name from pod_id
-          const PODS = [
-            { id: 'pod-1', name: 'Pod 1' },
-            { id: 'de', name: 'DE' },
-            { id: 'db', name: 'DB' },
-          ];
-          const pod = PODS.find(p => p.id === pod_id);
-          const podName = pod ? pod.name : pod_id;
-
-          await slackService.notifyNewSubmission({
-            req_id: createdRequest.id,
-            requester_name: req.user.name,
-            requester_email: req.user.email,
-            database_type: requestData.database_type,
-            database_name: db_name,
-            instance_name: requestData.instance_name,
-            query: queryText,
-            script: scriptContent,
-            pod_name: podName
-          });
-        }
-      } catch (slackError) {
-        console.error('Slack notification failed:', slackError.message);
-        // Don't fail the request if Slack notification fails
-      }
-    }
+    // Send Slack notification
+    await sendSlackNotification(createdRequest, req.user, {
+      db_name,
+      pod_id,
+      queryText,
+      scriptContent
+    });
 
     return res.status(201).json({
       success: true,
@@ -120,10 +135,7 @@ const submitRequest = async (req, res) => {
 
   } catch (error) {
     console.error("Submit request failed:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to submit request"
-    });
+    return createErrorResponse(res, 500, "Failed to submit request");
   }
 };
 
@@ -131,16 +143,11 @@ const getMyRequests = async (req, res) => {
   const userId = req.user?.id;
 
   if (!userId) {
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized"
-    });
+    return createErrorResponse(res, 401, "Unauthorized");
   }
 
   try {
-    // Query params validated by Zod middleware
     const { status, sortBy, limit, offset } = req.query;
-
     const rows = await requestService.getUserRequests(userId, {
       status,
       sortBy,
@@ -178,10 +185,7 @@ const getMyRequests = async (req, res) => {
 
   } catch (error) {
     console.error("Fetch user requests failed:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch requests"
-    });
+    return createErrorResponse(res, 500, "Failed to fetch requests");
   }
 };
 

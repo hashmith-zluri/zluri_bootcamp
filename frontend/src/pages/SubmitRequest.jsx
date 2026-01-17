@@ -43,51 +43,64 @@ export default function SubmitRequest() {
   const requestType = watch('requestType');
   const queryValue = watch('query');
 
+  // Cloned request handlers - extracted to reduce complexity
+  const clonedRequestHandlers = {
+    setDatabaseType: (data, setValue) => {
+      if (data.database_type) {
+        setValue('dbType', data.database_type);
+      }
+    },
+    
+    setRequestTypeAndContent: (data, setValue, setScriptContent, setSelectedFile, toast) => {
+      if (data.query) {
+        setValue('requestType', 'query');
+        setValue('query', data.query);
+      } else if (data.script) {
+        setValue('requestType', 'script');
+        setScriptContent(data.script);
+        // Auto-create file from script content
+        const blob = new Blob([data.script], { type: 'text/javascript' });
+        const file = new File([blob], 'cloned_script.js', { type: 'text/javascript' });
+        setSelectedFile(file);
+        toast.success('Script file auto-created from cloned request');
+      }
+    },
+    
+    setFormFields: (data, setValue) => {
+      setValue('comments', data.comments || '');
+      setValue('podId', data.pod_id || '');
+    },
+    
+    storeSessionData: (data) => {
+      if (data.instance_name) {
+        sessionStorage.setItem('clonedInstanceName', data.instance_name);
+      }
+      if (data.database_name) {
+        sessionStorage.setItem('clonedDatabaseName', data.database_name);
+      }
+    }
+  };
+
   // Check for cloned request data on mount
   useEffect(() => {
     const clonedData = localStorage.getItem('cloneRequest');
-    if (clonedData) {
-      try {
-        const data = JSON.parse(clonedData);
-        
-        // Set database type first
-        if (data.database_type) {
-          setValue('dbType', data.database_type);
-        }
-        
-        // Set form values from cloned data
-        if (data.query) {
-          setValue('requestType', 'query');
-          setValue('query', data.query);
-        } else if (data.script) {
-          setValue('requestType', 'script');
-          setScriptContent(data.script); // Store script content
-          // Auto-create file from script content
-          const blob = new Blob([data.script], { type: 'text/javascript' });
-          const file = new File([blob], 'cloned_script.js', { type: 'text/javascript' });
-          setSelectedFile(file);
-          toast.success('Script file auto-created from cloned request');
-        }
-        
-        setValue('comments', data.comments || '');
-        setValue('podId', data.pod_id || '');
-        
-        // Store instance name and database name to set after data loads
-        if (data.instance_name) {
-          sessionStorage.setItem('clonedInstanceName', data.instance_name);
-        }
-        if (data.database_name) {
-          sessionStorage.setItem('clonedDatabaseName', data.database_name);
-        }
-        
-        // Clear the cloned data
-        localStorage.removeItem('cloneRequest');
-        
-        toast.success('Request data loaded successfully!');
-      } catch (error) {
-        console.error('Failed to parse cloned request:', error);
-        localStorage.removeItem('cloneRequest');
-      }
+    if (!clonedData) return;
+
+    try {
+      const data = JSON.parse(clonedData);
+      
+      // Apply all handlers
+      clonedRequestHandlers.setDatabaseType(data, setValue);
+      clonedRequestHandlers.setRequestTypeAndContent(data, setValue, setScriptContent, setSelectedFile, toast);
+      clonedRequestHandlers.setFormFields(data, setValue);
+      clonedRequestHandlers.storeSessionData(data);
+      
+      // Clear the cloned data
+      localStorage.removeItem('cloneRequest');
+      toast.success('Request data loaded successfully!');
+    } catch (error) {
+      console.error('Failed to parse cloned request:', error);
+      localStorage.removeItem('cloneRequest');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,54 +1,62 @@
 const dbService = require("../services/db.service");
 
+// Helper functions
+const createErrorResponse = (res, status, message) => {
+  return res.status(status).json({
+    success: false,
+    message
+  });
+};
+
+const createSuccessResponse = (res, data) => {
+  return res.status(200).json({
+    success: true,
+    ...data
+  });
+};
+
 const dbController = {
   getDbTypes: (req, res) => {
-    res.status(200).json({ success: true, types: ["POSTGRES", "MONGO"] });
+    return createSuccessResponse(res, { types: ["POSTGRES", "MONGO"] });
   },
 
   getDbInstances: async (req, res) => {
     const { type } = req.query;
-    // Type is already validated by Zod middleware
+    
     try {
       const instances = await dbService.getInstancesByType(type);
-      res.status(200).json({
-        success: true,
-        instances: instances.map(row => ({ id: String(row.id), name: row.name }))
-      });
+      const formattedInstances = instances.map(row => ({ 
+        id: String(row.id), 
+        name: row.name 
+      }));
+      
+      return createSuccessResponse(res, { instances: formattedInstances });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      return createErrorResponse(res, 500, error.message);
     }
   },
 
   getDatabasesByInstance: async (req, res) => {
     const { id } = req.params;
+    
     try {
-      // Get the instance details from our portal database
       const instance = await dbService.getInstanceById(id);
       
       if (!instance) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Instance not found" 
-        });
+        return createErrorResponse(res, 404, "Instance not found");
       }
       
-      if (instance.engine === "POSTGRES" || instance.engine === "MONGO") {
-        // Get databases for this instance from instance_databases table
-        const databases = await dbService.getDatabasesByInstanceId(id);
-        res.status(200).json({ success: true, databases });
-        
-      } else {
-        res.status(400).json({ 
-          success: false, 
-          message: `Unsupported database engine: ${instance.engine}` 
-        });
+      const supportedEngines = ["POSTGRES", "MONGO"];
+      if (!supportedEngines.includes(instance.engine)) {
+        return createErrorResponse(res, 400, `Unsupported database engine: ${instance.engine}`);
       }
+      
+      const databases = await dbService.getDatabasesByInstanceId(id);
+      return createSuccessResponse(res, { databases });
+      
     } catch (error) {
       console.error("Get databases by instance failed:", error.message);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to fetch databases" 
-      });
+      return createErrorResponse(res, 500, "Failed to fetch databases");
     }
   }
 };

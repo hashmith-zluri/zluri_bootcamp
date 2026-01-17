@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CodeEditor from '../../../src/components/common/CodeEditor';
 
@@ -36,7 +36,9 @@ describe('CodeEditor', () => {
     it('should show line numbers when enabled', () => {
       render(<CodeEditor code="line1\nline2" readOnly={true} showLineNumbers={true} />);
       // Line numbers are rendered by SyntaxHighlighter
-      expect(screen.getByText('line1')).toBeInTheDocument();
+      const highlighter = screen.getByTestId('syntax-highlighter');
+      expect(highlighter).toHaveTextContent('line1');
+      expect(highlighter).toHaveTextContent('line2');
     });
   });
 
@@ -80,8 +82,10 @@ describe('CodeEditor', () => {
       render(<CodeEditor code="test" readOnly={false} onChange={onChange} />);
       
       const textarea = screen.getByRole('textbox');
-      textarea.focus();
-      textarea.setSelectionRange(4, 4);
+      await act(async () => {
+        textarea.focus();
+        textarea.setSelectionRange(4, 4);
+      });
       
       await user.keyboard('{Tab}');
       
@@ -131,6 +135,114 @@ describe('CodeEditor', () => {
       );
       
       expect(container).toBeInTheDocument();
+    });
+  });
+
+  describe('Scroll indicator', () => {
+    it('should show scroll indicator when content is scrollable in read-only mode', () => {
+      // Mock scrollHeight > clientHeight
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+        configurable: true,
+        value: 1000,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        value: 300,
+      });
+
+      const { container } = render(
+        <CodeEditor code="line1\nline2\nline3\nline4\nline5" readOnly={true} maxHeight="300px" />
+      );
+      
+      expect(container.querySelector('.absolute.bottom-2.right-2')).toBeInTheDocument();
+    });
+
+    it('should hide scroll indicator when focused in editable mode', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+        configurable: true,
+        value: 1000,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        value: 300,
+      });
+
+      render(
+        <CodeEditor code="test" readOnly={false} onChange={onChange} maxHeight="300px" />
+      );
+      
+      const textarea = screen.getByRole('textbox');
+      await user.click(textarea);
+      
+      // Scroll indicator should be hidden when focused (pointer-events-none)
+      expect(textarea).toHaveFocus();
+    });
+
+    it('should handle tab key with selection range', async () => {
+      const user = userEvent.setup();
+      const onChange = jest.fn();
+      render(<CodeEditor code="test code" readOnly={false} onChange={onChange} />);
+      
+      const textarea = screen.getByRole('textbox');
+      await act(async () => {
+        textarea.focus();
+        textarea.setSelectionRange(5, 9); // Select "code"
+      });
+      
+      await user.keyboard('{Tab}');
+      
+      // Should replace selection with spaces
+      expect(onChange).toHaveBeenCalledWith('test   ');
+    });
+
+    it('should not show scroll indicator when content fits', () => {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+        configurable: true,
+        value: 200,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        value: 300,
+      });
+
+      const { container } = render(
+        <CodeEditor code="short" readOnly={true} maxHeight="300px" />
+      );
+      
+      expect(container.querySelector('.absolute.bottom-2.right-2')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Line numbers in editable mode', () => {
+    it('should show line numbers overlay when enabled in editable mode', () => {
+      render(
+        <CodeEditor 
+          code="line1\nline2\nline3" 
+          readOnly={false} 
+          onChange={jest.fn()} 
+          showLineNumbers={true} 
+        />
+      );
+      
+      const lineNumbersOverlay = document.querySelector('.absolute.left-0.top-0');
+      expect(lineNumbersOverlay).toBeInTheDocument();
+    });
+
+    it('should not show line numbers overlay when disabled in editable mode', () => {
+      render(
+        <CodeEditor 
+          code="line1\nline2" 
+          readOnly={false} 
+          onChange={jest.fn()} 
+          showLineNumbers={false} 
+        />
+      );
+      
+      const lineNumbersOverlay = document.querySelector('.absolute.left-0.top-0');
+      expect(lineNumbersOverlay).not.toBeInTheDocument();
     });
   });
 });

@@ -2,6 +2,15 @@ import { render, screen } from '@testing-library/react';
 import AppRoutes from '../../src/routes/AppRoutes';
 import { ToastProvider } from '../../src/context/ToastContext';
 
+// Mock react-syntax-highlighter
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({ children }) => <pre data-testid="syntax-highlighter">{children}</pre>,
+}));
+
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({
+  vscDarkPlus: {},
+}));
+
 // Mock the API modules to prevent actual API calls
 jest.mock('../../src/utils/api', () => ({
   requestAPI: {

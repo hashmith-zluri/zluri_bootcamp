@@ -340,4 +340,139 @@ describe('API Utils', () => {
       );
     });
   });
+
+  describe('requestAPI - additional coverage', () => {
+    it('should include sortBy parameter', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ sortBy: 'created_at' });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('sortBy=created_at'), expect.any(Object));
+    });
+
+    it('should include limit when set to 0', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ limit: 0 });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('limit=0'), expect.any(Object));
+    });
+
+    it('should include offset when set to 0', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ offset: 0 });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('offset=0'), expect.any(Object));
+    });
+
+    it('should include all parameters together', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ 
+        status: 'PENDING', 
+        sortBy: 'created_at', 
+        limit: 10, 
+        offset: 20 
+      });
+      
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).toContain('status=PENDING');
+      expect(callUrl).toContain('sortBy=created_at');
+      expect(callUrl).toContain('limit=10');
+      expect(callUrl).toContain('offset=20');
+    });
+  });
+
+  describe('approvalAPI - additional coverage', () => {
+    it('should get pending requests with status filter', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ status: 'PENDING' });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('status=PENDING'), expect.any(Object));
+    });
+
+    it('should not include status when set to "all"', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ status: 'all' });
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).not.toContain('status=');
+    });
+
+    it('should include sortBy parameter', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ sortBy: 'created_at' });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('sortBy=created_at'), expect.any(Object));
+    });
+
+    it('should include limit when set to 0', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ limit: 0 });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('limit=0'), expect.any(Object));
+    });
+
+    it('should include offset when set to 0', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ offset: 0 });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('offset=0'), expect.any(Object));
+    });
+
+    it('should include all parameters together', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await approvalAPI.getPendingRequests({ 
+        status: 'EXECUTED', 
+        sortBy: 'updated_at', 
+        limit: 50, 
+        offset: 100 
+      });
+      
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).toContain('status=EXECUTED');
+      expect(callUrl).toContain('sortBy=updated_at');
+      expect(callUrl).toContain('limit=50');
+      expect(callUrl).toContain('offset=100');
+    });
+  });
 });

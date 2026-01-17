@@ -34,13 +34,27 @@ export default function OutputDisplay({ output, error }) {
     formatted.data && 
     (formatted.data.console_output || formatted.data.result_data || formatted.data.metadata || formatted.data.queries);
 
-  const renderJSON = (data, indent = 0) => {
-    if (data === null) return <span className="text-gray-500">null</span>;
-    if (data === undefined) return <span className="text-gray-500">undefined</span>;
-    if (typeof data === 'boolean') return <span className="text-purple-600 font-semibold">{String(data)}</span>;
-    if (typeof data === 'number') return <span className="text-blue-600 font-semibold">{data}</span>;
-    if (typeof data === 'string') return <span className="text-green-600">"{data}"</span>;
+  // Type renderers - extracted to reduce complexity
+  const typeRenderers = {
+    null: () => <span className="text-gray-500">null</span>,
+    undefined: () => <span className="text-gray-500">undefined</span>,
+    boolean: (data) => <span className="text-purple-600 font-semibold">{String(data)}</span>,
+    number: (data) => <span className="text-blue-600 font-semibold">{data}</span>,
+    string: (data) => <span className="text-green-600">"{data}"</span>,
+    default: (data) => <span>{String(data)}</span>
+  };
 
+  const renderJSON = (data, indent = 0) => {
+    // Handle primitive types
+    if (data === null) return typeRenderers.null();
+    if (data === undefined) return typeRenderers.undefined();
+    
+    const dataType = typeof data;
+    if (typeRenderers[dataType]) {
+      return typeRenderers[dataType](data);
+    }
+
+    // Handle arrays
     if (Array.isArray(data)) {
       if (data.length === 0) return <span className="text-gray-500">[]</span>;
       
@@ -60,7 +74,8 @@ export default function OutputDisplay({ output, error }) {
       );
     }
 
-    if (typeof data === 'object') {
+    // Handle objects
+    if (dataType === 'object') {
       const keys = Object.keys(data);
       if (keys.length === 0) return <span className="text-gray-500">{'{}'}</span>;
 
@@ -82,7 +97,7 @@ export default function OutputDisplay({ output, error }) {
       );
     }
 
-    return <span>{String(data)}</span>;
+    return typeRenderers.default(data);
   };
 
   const renderTable = (data) => {

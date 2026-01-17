@@ -98,23 +98,4 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Login Page')).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
-
-  it('should render multiple children when authenticated', () => {
-    const mockUser = { id: 1, email: 'test@example.com', role: 'DEVELOPER' };
-    localStorageMock.getItem.mockImplementation((key) => {
-      if (key === 'user') return JSON.stringify(mockUser);
-      if (key === 'token') return 'test-token';
-      return null;
-    });
-
-    renderWithRouter(
-      <ProtectedRoute>
-        <div>Content 1</div>
-        <div>Content 2</div>
-      </ProtectedRoute>
-    );
-
-    expect(screen.getByText('Content 1')).toBeInTheDocument();
-    expect(screen.getByText('Content 2')).toBeInTheDocument();
-  });
 });

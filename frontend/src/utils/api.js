@@ -64,6 +64,25 @@ export const dbAPI = {
   getDatabases: (instanceId) => apiRequest(`/db/instances/${instanceId}/name`),
 };
 
+// Helper function to build query parameters
+const buildQueryParams = (params) => {
+  const queryParams = new URLSearchParams();
+  
+  const paramHandlers = {
+    status: (value) => value && value !== 'all' && queryParams.append('status', value),
+    sortBy: (value) => value && queryParams.append('sortBy', value),
+    limit: (value) => (value !== undefined && value !== null) && queryParams.append('limit', String(value)),
+    offset: (value) => (value !== undefined && value !== null) && queryParams.append('offset', String(value))
+  };
+  
+  Object.entries(params).forEach(([key, value]) => {
+    const handler = paramHandlers[key];
+    if (handler) handler(value);
+  });
+  
+  return queryParams.toString();
+};
+
 // Request APIs
 export const requestAPI = {
   submit: (data) => apiRequest('/request', {
@@ -71,23 +90,7 @@ export const requestAPI = {
     body: JSON.stringify(data),
   }),
   getMyRequests: (params = {}) => {
-    const queryParams = new URLSearchParams();
-    
-    // Only add params if they have values
-    if (params.status && params.status !== 'all') {
-      queryParams.append('status', params.status);
-    }
-    if (params.sortBy) {
-      queryParams.append('sortBy', params.sortBy);
-    }
-    if (params.limit !== undefined && params.limit !== null) {
-      queryParams.append('limit', String(params.limit));
-    }
-    if (params.offset !== undefined && params.offset !== null) {
-      queryParams.append('offset', String(params.offset));
-    }
-    
-    const queryString = queryParams.toString();
+    const queryString = buildQueryParams(params);
     return apiRequest(`/request/mine${queryString ? `?${queryString}` : ''}`);
   },
   getResult: (reqId) => apiRequest(`/request/${reqId}/result`),
@@ -96,23 +99,7 @@ export const requestAPI = {
 // Approval APIs
 export const approvalAPI = {
   getPendingRequests: (params = {}) => {
-    const queryParams = new URLSearchParams();
-    
-    // Only add params if they have values
-    if (params.status && params.status !== 'all') {
-      queryParams.append('status', params.status);
-    }
-    if (params.sortBy) {
-      queryParams.append('sortBy', params.sortBy);
-    }
-    if (params.limit !== undefined && params.limit !== null) {
-      queryParams.append('limit', String(params.limit));
-    }
-    if (params.offset !== undefined && params.offset !== null) {
-      queryParams.append('offset', String(params.offset));
-    }
-    
-    const queryString = queryParams.toString();
+    const queryString = buildQueryParams(params);
     return apiRequest(`/approvals${queryString ? `?${queryString}` : ''}`);
   },
   approveOrReject: (reqId, action, reason = null) => apiRequest(`/approvals/${reqId}/action`, {

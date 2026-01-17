@@ -238,4 +238,175 @@ describe('OutputDisplay', () => {
       expect(screen.queryByText(/Result Data/)).not.toBeInTheDocument();
     });
   });
+
+
+  describe('Edge cases', () => {
+    it('should handle undefined value in JSON', () => {
+      const output = JSON.stringify({ value: undefined });
+      render(<OutputDisplay output={output} />);
+      
+      // undefined gets removed by JSON.stringify, so the object will be empty
+      expect(screen.getByText('{}')).toBeInTheDocument();
+    });
+
+    it('should handle nested arrays', () => {
+      const output = JSON.stringify([[1, 2], [3, 4]]);
+      render(<OutputDisplay output={output} />);
+      
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
+    });
+
+    it('should handle nested objects', () => {
+      const output = JSON.stringify({ user: { name: 'John', age: 30 } });
+      render(<OutputDisplay output={output} />);
+      
+      expect(screen.getByText('"user"')).toBeInTheDocument();
+      expect(screen.getByText('"name"')).toBeInTheDocument();
+      expect(screen.getByText('"John"')).toBeInTheDocument();
+    });
+
+    it('should handle array with non-object items', () => {
+      const output = JSON.stringify([1, 'text', true]);
+      render(<OutputDisplay output={output} />);
+      
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('"text"')).toBeInTheDocument();
+      expect(screen.getByText('true')).toBeInTheDocument();
+    });
+
+    it('should render table button for array with null items', () => {
+      const output = JSON.stringify([null, null]);
+      render(<OutputDisplay output={output} />);
+      
+      // Array is still an array, so table button should show
+      expect(screen.getByText('Table')).toBeInTheDocument();
+    });
+
+    it('should not render table for array with different object structures', () => {
+      const output = JSON.stringify([
+        { id: 1, name: 'John' },
+        { id: 2, email: 'jane@example.com' }
+      ]);
+      render(<OutputDisplay output={output} />);
+      
+      // Should show table button
+      expect(screen.getByText('Table')).toBeInTheDocument();
+    });
+
+    it('should handle table with object values in cells', async () => {
+      const user = userEvent.setup();
+      const output = JSON.stringify([
+        { id: 1, data: { nested: 'value' } },
+        { id: 2, data: { nested: 'value2' } }
+      ]);
+      render(<OutputDisplay output={output} />);
+      
+      await user.click(screen.getByText('Table'));
+      
+      // Should stringify nested objects
+      expect(screen.getByText(/"nested":"value"/)).toBeInTheDocument();
+    });
+
+    it('should handle table with null values in cells', async () => {
+      const user = userEvent.setup();
+      const output = JSON.stringify([
+        { id: 1, name: null },
+        { id: 2, name: 'John' }
+      ]);
+      render(<OutputDisplay output={output} />);
+      
+      await user.click(screen.getByText('Table'));
+      
+      expect(screen.getByText('John')).toBeInTheDocument();
+    });
+
+    it('should switch back to formatted view from table', async () => {
+      const user = userEvent.setup();
+      const output = JSON.stringify([
+        { id: 1, name: 'John' },
+        { id: 2, name: 'Jane' }
+      ]);
+      render(<OutputDisplay output={output} />);
+      
+      await user.click(screen.getByText('Table'));
+      // In table view, should see table headers
+      const tableHeaders = screen.getAllByText('id');
+      expect(tableHeaders.length).toBeGreaterThan(0);
+      
+      await user.click(screen.getByText('Formatted'));
+      // In formatted view, should see JSON keys with quotes (multiple instances)
+      const formattedKeys = screen.getAllByText('"id"');
+      expect(formattedKeys.length).toBeGreaterThan(0);
+    });
+
+    it('should handle script output with metadata field', () => {
+      const output = JSON.stringify({
+        console_output: 'Test',
+        metadata: { duration: 100 }
+      });
+      render(<OutputDisplay output={output} />);
+      
+      expect(screen.getByText('Console Output')).toBeInTheDocument();
+    });
+
+    it('should handle script output with queries field', () => {
+      const output = JSON.stringify({
+        console_output: 'Test',
+        queries: ['SELECT * FROM users']
+      });
+      render(<OutputDisplay output={output} />);
+      
+      expect(screen.getByText('Console Output')).toBeInTheDocument();
+    });
+
+    it('should not show view mode toggle for script output', () => {
+      const output = JSON.stringify({
+        console_output: 'Test',
+        result_data: [{ id: 1 }]
+      });
+      render(<OutputDisplay output={output} />);
+      
+      // Should not show Formatted/Raw/Table buttons
+      expect(screen.queryByText('Formatted')).not.toBeInTheDocument();
+      expect(screen.queryByText('Raw')).not.toBeInTheDocument();
+    });
+
+    it('should render result data as JSON when table cannot be rendered', async () => {
+      const user = userEvent.setup();
+      const output = JSON.stringify({
+        console_output: 'Test',
+        result_data: [1, 2, 3] // Array of primitives, not objects
+      });
+      render(<OutputDisplay output={output} />);
+      
+      // Should show result data section
+      expect(screen.getByText(/Result Data/)).toBeInTheDocument();
+      
+      // Should render as JSON since table can't be created
+      expect(screen.getByText(/1/)).toBeInTheDocument();
+    });
+
+    it('should handle empty console output', () => {
+      const output = JSON.stringify({
+        console_output: '',
+        result_data: [{ id: 1 }]
+      });
+      render(<OutputDisplay output={output} />);
+      
+      // Should not show console output section when empty
+      expect(screen.queryByText('Console Output')).not.toBeInTheDocument();
+    });
+
+    it('should handle result data with empty array after checking length', () => {
+      const output = JSON.stringify({
+        console_output: 'Test',
+        result_data: []
+      });
+      render(<OutputDisplay output={output} />);
+      
+      // Should not show result data section
+      expect(screen.queryByText(/Result Data/)).not.toBeInTheDocument();
+    });
+  });
 });

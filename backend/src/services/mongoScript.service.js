@@ -182,6 +182,136 @@ class MongoScriptExecutionService {
             
             const db = client.db(workerData.databaseName);
             
+            // Wrap database operations to detect errors
+            const originalCollection = db.collection.bind(db);
+            db.collection = (name) => {
+              const collection = originalCollection(name);
+              
+              // Wrap collection methods to detect errors
+              const wrapMethod = (methodName) => {
+                const originalMethod = collection[methodName].bind(collection);
+                return (...args) => {
+                  try {
+                    const result = originalMethod(...args);
+                    
+                    // If this is a find operation, wrap the cursor methods too
+                    if (methodName === 'find' && result && typeof result.toArray === 'function') {
+                      const originalToArray = result.toArray.bind(result);
+                      const originalForEach = result.forEach ? result.forEach.bind(result) : null;
+                      const originalMap = result.map ? result.map.bind(result) : null;
+                      const originalLimit = result.limit ? result.limit.bind(result) : null;
+                      const originalSkip = result.skip ? result.skip.bind(result) : null;
+                      const originalSort = result.sort ? result.sort.bind(result) : null;
+                      
+                      result.toArray = async () => {
+                        try {
+                          return await originalToArray();
+                        } catch (error) {
+                          global.__hasDbError = true;
+                          global.__dbErrorMessage = error.message;
+                          throw error;
+                        }
+                      };
+                      
+                      if (originalForEach) {
+                        result.forEach = async (callback) => {
+                          try {
+                            return await originalForEach(callback);
+                          } catch (error) {
+                            global.__hasDbError = true;
+                            global.__dbErrorMessage = error.message;
+                            throw error;
+                          }
+                        };
+                      }
+                      
+                      if (originalMap) {
+                        result.map = (callback) => {
+                          try {
+                            const mappedCursor = originalMap(callback);
+                            // Recursively wrap the mapped cursor
+                            if (mappedCursor && typeof mappedCursor.toArray === 'function') {
+                              const origToArray = mappedCursor.toArray.bind(mappedCursor);
+                              mappedCursor.toArray = async () => {
+                                try {
+                                  return await origToArray();
+                                } catch (error) {
+                                  global.__hasDbError = true;
+                                  global.__dbErrorMessage = error.message;
+                                  throw error;
+                                }
+                              };
+                            }
+                            return mappedCursor;
+                          } catch (error) {
+                            global.__hasDbError = true;
+                            global.__dbErrorMessage = error.message;
+                            throw error;
+                          }
+                        };
+                      }
+                      
+                      // Wrap chaining methods that return cursors
+                      if (originalLimit) {
+                        result.limit = (num) => {
+                          const limitedCursor = originalLimit(num);
+                          return wrapCursor(limitedCursor);
+                        };
+                      }
+                      
+                      if (originalSkip) {
+                        result.skip = (num) => {
+                          const skippedCursor = originalSkip(num);
+                          return wrapCursor(skippedCursor);
+                        };
+                      }
+                      
+                      if (originalSort) {
+                        result.sort = (sortSpec) => {
+                          const sortedCursor = originalSort(sortSpec);
+                          return wrapCursor(sortedCursor);
+                        };
+                      }
+                    }
+                    
+                    return result;
+                  } catch (error) {
+                    global.__hasDbError = true;
+                    global.__dbErrorMessage = error.message;
+                    throw error;
+                  }
+                };
+              };
+              
+              // Helper function to wrap cursor methods
+              const wrapCursor = (cursor) => {
+                if (!cursor || typeof cursor.toArray !== 'function') return cursor;
+                
+                const originalToArray = cursor.toArray.bind(cursor);
+                cursor.toArray = async () => {
+                  try {
+                    return await originalToArray();
+                  } catch (error) {
+                    global.__hasDbError = true;
+                    global.__dbErrorMessage = error.message;
+                    throw error;
+                  }
+                };
+                
+                return cursor;
+              };
+              
+              // Wrap common MongoDB operations
+              ['find', 'findOne', 'insertOne', 'insertMany', 'updateOne', 'updateMany', 
+               'deleteOne', 'deleteMany', 'aggregate', 'countDocuments', 'distinct'].forEach(method => {
+                if (typeof collection[method] === 'function') {
+                  collection[method] = wrapMethod(method);
+                }
+              });
+              
+              return collection;
+            };
+            
             global.db = db;
             global.client = client;
             global.collection = (name) => db.collection(name);
@@ -204,16 +334,64 @@ class MongoScriptExecutionService {
             
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            parentPort.postMessage({
-              success: true,
-              output: userOutput.trim(),
-              metadata: {
-                database: workerData.databaseName,
-                host: workerData.host,
-                port: workerData.port,
-                executed_at: new Date().toISOString()
+            // Check if any database errors occurred during execution
+            if (global.__hasDbError) {
+              parentPort.postMessage({
+                success: false,
+                error: global.__dbErrorMessage,
+                output: userOutput.trim(),
+                metadata: {
+                  database: workerData.databaseName,
+                  host: workerData.host,
+                  port: workerData.port,
+                  executed_at: new Date().toISOString()
+                }
+              });
+            } else {
+              // Check if the output contains error messages indicating failure
+              const outputLower = userOutput.toLowerCase();
+              const hasErrorInOutput = outputLower.includes('failed to') || 
+                                     outputLower.includes('error:') || 
+                                     outputLower.includes('is not defined') ||
+                                     outputLower.includes('cannot read') ||
+                                     outputLower.includes('undefined') ||
+                                     outputLower.includes('query is not defined');
+              
+              if (hasErrorInOutput) {
+                // Extract error message from output
+                const lines = userOutput.split('\\n');
+                const errorLine = lines.find(line => 
+                  line.toLowerCase().includes('failed to') || 
+                  line.toLowerCase().includes('is not defined') ||
+                  line.toLowerCase().includes('cannot read') ||
+                  line.toLowerCase().includes('undefined') ||
+                  line.toLowerCase().includes('query is not defined')
+                );
+                
+                parentPort.postMessage({
+                  success: false,
+                  error: errorLine || 'Script execution failed',
+                  output: userOutput.trim(),
+                  metadata: {
+                    database: workerData.databaseName,
+                    host: workerData.host,
+                    port: workerData.port,
+                    executed_at: new Date().toISOString()
+                  }
+                });
+              } else {
+                parentPort.postMessage({
+                  success: true,
+                  output: userOutput.trim(),
+                  metadata: {
+                    database: workerData.databaseName,
+                    host: workerData.host,
+                    port: workerData.port,
+                    executed_at: new Date().toISOString()
+                  }
+                });
               }
-            });
+            }
             
           } catch (error) {
             parentPort.postMessage({

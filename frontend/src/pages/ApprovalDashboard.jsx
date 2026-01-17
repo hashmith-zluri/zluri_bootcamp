@@ -76,49 +76,48 @@ export default function ApprovalDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  // Search field handlers - extracted to reduce complexity
+  const searchHandlers = {
+    req_id: (req, searchTerm) => req.req_id?.toString().includes(searchTerm),
+    requester_email: (req, searchLower) => req.requester_email?.toLowerCase().includes(searchLower),
+    requester_name: (req, searchLower) => req.requester_name?.toLowerCase().includes(searchLower),
+    database_name: (req, searchLower) => req.database_name?.toLowerCase().includes(searchLower),
+    query: (req, searchLower) => 
+      (req.query && req.query.toLowerCase().includes(searchLower)) || 
+      (req.script && req.script.toLowerCase().includes(searchLower)),
+    comments: (req, searchLower) => req.comments?.toLowerCase().includes(searchLower),
+    risk: (req, searchLower) => {
+      const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+      const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+      return riskLabel.includes(searchLower);
+    },
+    all: (req, searchLower, searchTerm) => {
+      const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+      const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+      
+      const searchFields = [
+        req.req_id?.toString().includes(searchTerm),
+        req.requester_email?.toLowerCase().includes(searchLower),
+        req.requester_name?.toLowerCase().includes(searchLower),
+        req.database_name?.toLowerCase().includes(searchLower),
+        req.query && req.query.toLowerCase().includes(searchLower),
+        req.script && req.script.toLowerCase().includes(searchLower),
+        req.comments?.toLowerCase().includes(searchLower),
+        riskLabel.includes(searchLower)
+      ];
+      
+      return searchFields.some(Boolean);
+    }
+  };
+
   // Filter and search (search is client-side, status filter is server-side)
   const filteredRequests = useMemo(() => {
-    return requests.filter(req => {
-      if (!debouncedSearch) return true;
-      
-      const searchLower = debouncedSearch.toLowerCase();
-      
-      switch (searchField) {
-        case 'req_id':
-          return req.req_id?.toString().includes(debouncedSearch);
-        case 'requester_email':
-          return req.requester_email?.toLowerCase().includes(searchLower);
-        case 'requester_name':
-          return req.requester_name?.toLowerCase().includes(searchLower);
-        case 'database_name':
-          return req.database_name?.toLowerCase().includes(searchLower);
-        case 'query':
-          return (req.query && req.query.toLowerCase().includes(searchLower)) || 
-                 (req.script && req.script.toLowerCase().includes(searchLower));
-        case 'comments':
-          return req.comments?.toLowerCase().includes(searchLower);
-        case 'risk': {
-          const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-          const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-          return riskLabel.includes(searchLower);
-        }
-        case 'all':
-        default: {
-          const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-          const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-          return (
-            req.req_id?.toString().includes(debouncedSearch) ||
-            req.requester_email?.toLowerCase().includes(searchLower) ||
-            req.requester_name?.toLowerCase().includes(searchLower) ||
-            req.database_name?.toLowerCase().includes(searchLower) ||
-            (req.query && req.query.toLowerCase().includes(searchLower)) ||
-            (req.script && req.script.toLowerCase().includes(searchLower)) ||
-            req.comments?.toLowerCase().includes(searchLower) ||
-            riskLabel.includes(searchLower)
-          );
-        }
-      }
-    });
+    if (!debouncedSearch) return requests;
+    
+    const searchLower = debouncedSearch.toLowerCase();
+    const handler = searchHandlers[searchField] || searchHandlers.all;
+    
+    return requests.filter(req => handler(req, searchLower, debouncedSearch));
   }, [requests, debouncedSearch, searchField]);
 
   // Pagination

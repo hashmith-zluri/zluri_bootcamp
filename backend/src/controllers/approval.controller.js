@@ -3,30 +3,123 @@ const executionService = require("../services/execution.service");
 const approvalService = require("../services/approval.service");
 const slackService = require("../services/slack.service");
 
-const getApprovalRequests = async (req, res) => {
-  const managerEmail = req.user?.email;
-  const role = req.user?.role;
+// Helper functions
+const createErrorResponse = (res, status, message) => {
+  return res.status(status).json({
+    success: false,
+    message
+  });
+};
 
-  const allowedRoles = ["MANAGER"];
-  if (!allowedRoles.includes(role)) {
-    return res.status(403).json({ success: false, message: "Access denied" });
-  }
+const createSuccessResponse = (res, data, status = 200) => {
+  return res.status(status).json({
+    success: true,
+    ...data
+  });
+};
 
-  const managedPods = pods
+const getManagedPods = (managerEmail) => {
+  return pods
     .filter(pod => pod.manager_email === managerEmail)
     .map(pod => pod.id);
+};
 
-  if (managedPods.length === 0) {
-    return res.status(200).json({
-      success: true,
-      requests: []
+const validateManagerAccess = (role, managedPods) => {
+  const allowedRoles = ["MANAGER"];
+  
+  if (!allowedRoles.includes(role)) {
+    return { valid: false, error: "Access denied", status: 403 };
+  }
+  
+  // Don't fail if no pods - just return empty array (original behavior)
+  return { valid: true };
+};
+
+const validateRequestAccess = (request, managedPods) => {
+  if (!request) {
+    return { valid: false, error: "Request not found", status: 404 };
+  }
+  
+  if (request.status !== 'PENDING') {
+    return { 
+      valid: false, 
+      error: `Request already processed. Current status: ${request.status}`, 
+      status: 400 
+    };
+  }
+  
+  if (!managedPods.includes(request.pod_id)) {
+    return { 
+      valid: false, 
+      error: "Access denied - request belongs to different POD", 
+      status: 403 
+    };
+  }
+  
+  return { valid: true };
+};
+
+const triggerExecution = (req_id, approvedRequest) => {
+  // Only trigger execution if there's something to execute
+  if (!approvedRequest.query_text && !approvedRequest.script_path) {
+    console.log(`No query or script to execute for request ${req_id}`);
+    return;
+  }
+  
+  const executionType = approvedRequest.query_text ? 'query' : 'script';
+  console.log(`Triggering ${executionType} execution for approved request ${req_id}`);
+  
+  executionService.executeQuery(req_id)
+    .then(result => /*istanbul ignore next*/{
+      console.log(`${executionType} execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
+    })
+    .catch(error => /*istanbul ignore next*/{
+      console.error(`${executionType} execution error for request ${req_id}:`, error.message);
     });
+};
+
+const sendRejectionNotification = async (req_id, reason, requestPodId) => {
+  if (!slackService.isEnabled()) return;
+
+  try {
+    const requestData = await approvalService.getRequestForNotification(req_id);
+    if (!requestData) return;
+
+    const pod = pods.find(p => p.id === requestPodId);
+    const podName = pod ? pod.name : requestPodId;
+
+    await slackService.notifyRejection({
+      req_id: requestData.id,
+      requester_name: requestData.requester_name,
+      requester_email: requestData.requester_email,
+      database_type: requestData.database_type,
+      database_name: requestData.database_name,
+      instance_name: requestData.instance_name,
+      query: requestData.query_text,
+      script: requestData.script_path,
+      pod_name: podName
+    }, reason);
+  } catch (slackError) {
+    console.error('Slack notification failed:', slackError.message);
+  }
+};
+
+const getApprovalRequests = async (req, res) => {
+  const { email: managerEmail, role } = req.user || {};
+  const managedPods = getManagedPods(managerEmail);
+  
+  const accessValidation = validateManagerAccess(role, managedPods);
+  if (!accessValidation.valid) {
+    return createErrorResponse(res, accessValidation.status, accessValidation.error);
+  }
+
+  // Return empty array if no managed pods (original behavior)
+  if (managedPods.length === 0) {
+    return createSuccessResponse(res, { requests: [] });
   }
 
   try {
-    // Query params validated by Zod middleware
     const { status, sortBy, limit, offset } = req.query;
-
     const rows = await approvalService.getApprovalRequestsByPods(managedPods, {
       status,
       sortBy,
@@ -59,190 +152,104 @@ const getApprovalRequests = async (req, res) => {
         : null
     }));
 
-    return res.status(200).json({
-      success: true,
-      requests
-    });
+    return createSuccessResponse(res, { requests });
 
   } catch (error) {
     console.error("Approval list fetch failed:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch approval requests"
-    });
+    return createErrorResponse(res, 500, "Failed to fetch approval requests");
   }
 };
 
 const approveOrReject = async (req, res) => {
-    const { req_id } = req.params;
-    const { action, reason } = req.body;
-    const approverId = req.user?.id;
-    const managerEmail = req.user?.email;
-    const role = req.user?.role;
+  const { req_id } = req.params;
+  const { action, reason } = req.body;
+  const { id: approverId, email: managerEmail, role } = req.user || {};
   
-    if (role !== "MANAGER") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied"
-      });
+  const managedPods = getManagedPods(managerEmail);
+  const accessValidation = validateManagerAccess(role, managedPods);
+  
+  if (!accessValidation.valid) {
+    return createErrorResponse(res, accessValidation.status, accessValidation.error);
+  }
+
+  // Check if manager has pods assigned
+  if (managedPods.length === 0) {
+    return createErrorResponse(res, 403, "Access denied - no PODs assigned");
+  }
+
+  try {
+    const request = await approvalService.getRequestById(req_id);
+    const requestValidation = validateRequestAccess(request, managedPods);
+    
+    if (!requestValidation.valid) {
+      return createErrorResponse(res, requestValidation.status, requestValidation.error);
     }
 
-    const managedPods = pods
-      .filter(pod => pod.manager_email === managerEmail)
-      .map(pod => pod.id);
-
-    if (managedPods.length === 0) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied - no PODs assigned"
-      });
-    }
-  
-    try {
-      const request = await approvalService.getRequestById(req_id);
-
-      if (!request) {
-        return res.status(404).json({
-          success: false,
-          message: "Request not found"
-        });
-      }
-
-      if (request.status !== 'PENDING') {
-        return res.status(400).json({
-          success: false,
-          message: `Request already processed. Current status: ${request.status}`
-        });
-      }
-
-      const requestPodId = request.pod_id;
-      if (!managedPods.includes(requestPodId)) {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied - request belongs to different POD"
-        });
-      }
-
-      if (action === "approve") {
+    // Action handlers
+    const actionHandlers = {
+      approve: async () => {
         const approvedRequest = await approvalService.approveRequest(req_id, approverId);
-
+        
         if (!approvedRequest) {
-          return res.status(404).json({
-            success: false,
-            message: "Request not found or already processed"
-          });
+          return createErrorResponse(res, 404, "Request not found or already processed");
         }
         
-        if (approvedRequest.query_text) {
-          console.log(`Triggering query execution for approved request ${req_id}`);
-          executionService.executeQuery(req_id)
-            .then(result => /*istanbul ignore next*/{
-              console.log(`Query execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
-            })
-            .catch(error => /*istanbul ignore next*/{
-              console.error(`Query execution error for request ${req_id}:`, error.message);
-            });
-        } else if (approvedRequest.script_path) {
-          console.log(`Triggering script execution for approved request ${req_id}`);
-          executionService.executeQuery(req_id)
-            .then(result => /*istanbul ignore next*/{
-              console.log(`Script execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
-            })
-            .catch(error => /*istanbul ignore next*/{
-              console.error(`Script execution error for request ${req_id}:`, error.message);
-            });
-        }
-
-        return res.status(200).json({ success: true, status: "approved" });
-      }
-
-      if (action === "reject") {
+        triggerExecution(req_id, approvedRequest);
+        return createSuccessResponse(res, { status: "approved" });
+      },
+      
+      reject: async () => {
         const rejectedRequest = await approvalService.rejectRequest(req_id, approverId, reason);
         
         if (!rejectedRequest) {
-          return res.status(404).json({
-            success: false,
-            message: "Request not found or already processed"
-          });
+          return createErrorResponse(res, 404, "Request not found or already processed");
         }
 
         await approvalService.logRejection(req_id, reason);
-
-        // Send Slack notification for rejection
-        if (slackService.isEnabled()) {
-          try {
-            // Fetch complete request data for notification
-            const requestData = await approvalService.getRequestForNotification(req_id);
-            
-            if (requestData) {
-              // Get pod name from pod_id
-              const pod = pods.find(p => p.id === requestPodId);
-              const podName = pod ? pod.name : requestPodId;
-
-              await slackService.notifyRejection({
-                req_id: rejectedRequest.id,
-                requester_name: requestData.requester_name,
-                requester_email: requestData.requester_email,
-                database_type: requestData.database_type,
-                database_name: requestData.database_name,
-                instance_name: requestData.instance_name,
-                query: requestData.query_text,
-                script: requestData.script_path,
-                pod_name: podName
-              }, reason);
-            }
-          } catch (slackError) {
-            console.error('Slack notification failed:', slackError.message);
-          }
-        }
-  
-        return res.status(200).json({
-          success: true,
+        await sendRejectionNotification(req_id, reason, request.pod_id);
+        
+        return createSuccessResponse(res, {
           status: "rejected",
           reason: reason || null
         });
       }
-  
-    } catch (error) {
-      console.error("Approval action failed:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Approval action failed"
-      });
+    };
+
+    const handler = actionHandlers[action];
+    if (!handler) {
+      return createErrorResponse(res, 400, "Invalid action");
     }
-  };
+
+    return await handler();
+
+  } catch (error) {
+    console.error("Approval action failed:", error);
+    return createErrorResponse(res, 500, "Approval action failed");
+  }
+};
   
 const getExecutionResult = async (req, res) => {
   const { req_id } = req.params;
-  const userId = req.user?.id;
+  const { id: userId, role: userRole } = req.user || {};
 
   try {
     const request = await approvalService.getRequestOwnership(req_id);
 
     if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: "Request not found"
-      });
+      return createErrorResponse(res, 404, "Request not found");
     }
-    const userRole = req.user?.role;
 
-    if (request.requester_id !== userId && !['MANAGER', 'ADMIN'].includes(userRole)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied"
-      });
+    const hasAccess = request.requester_id === userId || ['MANAGER', 'ADMIN'].includes(userRole);
+    if (!hasAccess) {
+      return createErrorResponse(res, 403, "Access denied");
     }
 
     const result = await executionService.getExecutionResult(req_id);
-    return res.status(200).json({ success: true, ...result });
+    return createSuccessResponse(res, result);
 
   } catch (error) {
     console.error(`Failed to get execution result for request ${req_id}:`, error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get execution result"
-    });
+    return createErrorResponse(res, 500, "Failed to get execution result");
   }
 };
 

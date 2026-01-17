@@ -1,37 +1,47 @@
 const authService = require("../services/auth.service");
 
+// Helper functions
+const createErrorResponse = (res, status, message) => {
+  return res.status(status).json({
+    success: false,
+    message
+  });
+};
+
+const createSuccessResponse = (res, data, status = 200) => {
+  return res.status(status).json({
+    success: true,
+    ...data
+  });
+};
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
-    res.status(200).json({
-      success: true,
+    
+    return createSuccessResponse(res, {
       token: result.token,
-      user: result.user,
+      user: result.user
     });
   } catch (error) {
-    res.status(401).json({
-      success: false,
-      message: error.message || "Authentication failed",
-    });
+    return createErrorResponse(res, 401, error.message || "Authentication failed");
   }
 };
 
 const logout = async (req, res) => {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
+    
     if (token) {
       authService.logout(token);
     }
-    res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
+    
+    return createSuccessResponse(res, {
+      message: "Logged out successfully"
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Logout failed",
-    });
+    return createErrorResponse(res, 500, error.message || "Logout failed");
   }
 };
 
