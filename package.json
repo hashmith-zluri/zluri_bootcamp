@@ -1,0 +1,19 @@
+{
+  "name": "zluri-bootcamp-backend",
+  "version": "1.0.0",
+  "description": "Database Query Management System Backend",
+  "main": "backend/src/server.js",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
+    "test": "cd backend && npm test",
+    "install": "cd backend && npm ci"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": ["database", "query", "management", "postgresql", "mongodb"],
+  "author": "Hashmith",
+  "license": "ISC"
+}
