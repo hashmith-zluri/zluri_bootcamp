@@ -191,20 +191,11 @@ class MongoScriptExecutionService {
               socketTimeoutMS: 30000
             };
             
-            // Enhanced TLS options for Atlas connections in production
+            // TLS options for Atlas connections (only supported options)
             if (workerData.connectionString.includes('mongodb+srv://')) {
               clientOptions.tls = true;
               clientOptions.tlsAllowInvalidCertificates = true;
               clientOptions.tlsAllowInvalidHostnames = true;
-              // Additional SSL options for Railway/production environments
-              clientOptions.ssl = true;
-              clientOptions.sslValidate = false;
-              // Use stable API version for Atlas
-              clientOptions.serverApi = {
-                version: '1',
-                strict: false,
-                deprecationErrors: false
-              };
             }
             
             client = new MongoClient(workerData.connectionString, clientOptions);

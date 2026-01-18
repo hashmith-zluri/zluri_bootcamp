@@ -32,28 +32,20 @@ const createMongoConnection = async (instanceConfig) => {
   }
   
   console.log(`Creating MongoDB connection to: ${host}`);
+  console.log(`Connection string format: ${host && host.includes('mongodb.net') ? 'Atlas (mongodb+srv)' : 'Local'}`);
   
   const client = new MongoClient(connectionString, {
     maxPoolSize: 5,
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 30000,
-    maxIdleTimeoutMS: 300000,
-    // Enhanced TLS configuration for Atlas in production
+    maxIdleTimeMS: 300000,
+    // TLS configuration for Atlas (only supported options)
     tls: host && host.includes('mongodb.net'),
     tlsAllowInvalidCertificates: true,
     tlsAllowInvalidHostnames: true,
-    // Additional SSL options for Railway/production environments
-    ssl: host && host.includes('mongodb.net'),
-    sslValidate: false,
     // Connection retry options
     retryWrites: true,
-    retryReads: true,
-    // Use stable API version for Atlas
-    serverApi: host && host.includes('mongodb.net') ? {
-      version: '1',
-      strict: false,
-      deprecationErrors: false
-    } : undefined
+    retryReads: true
   });
   
   await client.connect();
