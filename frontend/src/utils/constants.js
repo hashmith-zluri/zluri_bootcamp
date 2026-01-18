@@ -4,7 +4,7 @@ export const ROLES = {
   ADMIN: 'ADMIN'
 };
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://zluribootcamp-production.up.railway.app/api/v1';
 
 // Role-based access control
 export const ROLE_ACCESS = {
