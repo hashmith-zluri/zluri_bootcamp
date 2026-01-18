@@ -144,6 +144,35 @@ describe('Risk Assessment', () => {
         expect(result.level).toBe('low');
         expect(result.reasons).toContain('Read-only operation - safe to execute');
       });
+
+      it('should detect SQL operations in JavaScript query() calls', () => {
+        const script = `
+          async function deleteUser() {
+            const result = await query('DROP table users;');
+            return result;
+          }
+        `;
+        const result = assessQueryRisk(null, script, 'POSTGRES');
+        
+        expect(result.level).toBe('critical');
+        expect(result.reasons.some(reason => reason.includes('DROP operation in query() call'))).toBe(true);
+      });
+
+      it('should detect UPDATE operations in JavaScript query() calls', () => {
+        const script = `const result = await query('UPDATE users SET active = false');`;
+        const result = assessQueryRisk(null, script, 'POSTGRES');
+        
+        expect(result.level).toBe('critical'); // Gets both UPDATE without WHERE (4) + UPDATE (2) = 6 points
+        expect(result.reasons.some(reason => reason.includes('UPDATE operation in query() call'))).toBe(true);
+      });
+
+      it('should detect INSERT operations in JavaScript query() calls', () => {
+        const script = `const result = await query('INSERT INTO users (name) VALUES ("test")');`;
+        const result = assessQueryRisk(null, script, 'POSTGRES');
+        
+        expect(result.level).toBe('medium');
+        expect(result.reasons.some(reason => reason.includes('INSERT operation in query() call'))).toBe(true);
+      });
     });
     describe('Comment Handling', () => {
       it('should ignore SQL comments in AST analysis', () => {

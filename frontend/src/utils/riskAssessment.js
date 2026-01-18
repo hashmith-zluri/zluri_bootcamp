@@ -1,4 +1,5 @@
-import { Parser } from 'node-sql-parser';
+import sqlParser from 'node-sql-parser';
+const { Parser } = sqlParser;
 
 /**
  * Advanced Risk Assessment System
@@ -361,7 +362,7 @@ const analyzeMongoScript = (script) => {
       type: 'high'
     },
     {
-      pattern: /FUNCTION\s*\(\s*['"`][^'"`]*['"`]\s*\)/gi,
+      pattern: /(?:NEW\s+)?FUNCTION\s*\(\s*['"`\\][^'"`\\]*['"`\\]/gi,
       reason: 'Dynamic function creation - code injection risk',
       points: 3,
       type: 'high'
@@ -385,9 +386,73 @@ const analyzeMongoScript = (script) => {
       type: 'high'
     }
   ];
+
+  // SQL injection patterns in JavaScript (query() calls, etc.)
+  const sqlInJsPatterns = [
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*DROP[^'"`]*['"`]/gi,
+      reason: 'DROP operation in query() call - permanently deletes data',
+      points: 6,
+      type: 'critical'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*TRUNCATE[^'"`]*['"`]/gi,
+      reason: 'TRUNCATE operation in query() call - removes all table data',
+      points: 6,
+      type: 'critical'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*DELETE\s+FROM\s+\w+\s*;?\s*['"`]/gi,
+      reason: 'DELETE without WHERE in query() call - affects all rows',
+      points: 5,
+      type: 'critical'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*UPDATE\s+\w+\s+SET[^'"`]*\s*;?\s*['"`]/gi,
+      reason: 'UPDATE without WHERE in query() call - may affect all rows',
+      points: 4,
+      type: 'high'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*DELETE\s+FROM[^'"`]*['"`]/gi,
+      reason: 'DELETE operation in query() call',
+      points: 2,
+      type: 'medium'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*UPDATE[^'"`]*SET[^'"`]*['"`]/gi,
+      reason: 'UPDATE operation in query() call',
+      points: 2,
+      type: 'medium'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*INSERT\s+INTO[^'"`]*['"`]/gi,
+      reason: 'INSERT operation in query() call',
+      points: 2,
+      type: 'medium'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*ALTER\s+TABLE[^'"`]*['"`]/gi,
+      reason: 'ALTER TABLE operation in query() call',
+      points: 4,
+      type: 'high'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*CREATE\s+(?:USER|ROLE)[^'"`]*['"`]/gi,
+      reason: 'User/role creation in query() call',
+      points: 4,
+      type: 'high'
+    },
+    {
+      pattern: /QUERY\s*\(\s*['"`][^'"`]*(?:GRANT|REVOKE)[^'"`]*['"`]/gi,
+      reason: 'Permission changes in query() call',
+      points: 4,
+      type: 'high'
+    }
+  ];
   
   // Analyze patterns
-  [...mongoPatterns, ...jsSecurityPatterns].forEach(({ pattern, reason, points, type }) => {
+  [...mongoPatterns, ...jsSecurityPatterns, ...sqlInJsPatterns].forEach(({ pattern, reason, points, type }) => {
     const regex = new RegExp(pattern.source, pattern.flags);
     if (regex.test(cleanScript)) {
       riskScore += points;
