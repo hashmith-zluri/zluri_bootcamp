@@ -147,7 +147,19 @@ class MongoScriptExecutionService {
     return new Promise((resolve) => {
       const { Worker } = require('worker_threads');
       
-      const connectionString = `mongodb://${instance.host || 'localhost'}:${instance.port || 27017}/${databaseName}`;
+      // Create proper connection string for Atlas or local MongoDB
+      let connectionString;
+      
+      if (instance.host && instance.host.includes('mongodb.net')) {
+        // Atlas connection string format - encode password for URL safety
+        const encodedPassword = encodeURIComponent(instance.password);
+        connectionString = `mongodb+srv://${instance.username}:${encodedPassword}@${instance.host}/${databaseName}?retryWrites=true&w=majority&appName=mongo-1`;
+      } else {
+        // Local MongoDB connection string format
+        connectionString = `mongodb://${instance.host || 'localhost'}:${instance.port || 27017}/${databaseName}`;
+      }
+      
+      console.log(`MongoDB connection string created for: ${instance.host}`);
       
       const workerScript = `
         const { parentPort, workerData } = require('worker_threads');
@@ -172,11 +184,21 @@ class MongoScriptExecutionService {
               userOutput += '[ERROR] ' + logMessage + '\\n';
             };
             
-            client = new MongoClient(workerData.connectionString, {
+            // Create MongoDB client with appropriate options for Atlas or local
+            const clientOptions = {
               maxPoolSize: 5,
               serverSelectionTimeoutMS: 10000,
               socketTimeoutMS: 30000
-            });
+            };
+            
+            // Add TLS options for Atlas connections
+            if (workerData.connectionString.includes('mongodb+srv://')) {
+              clientOptions.tls = true;
+              clientOptions.tlsAllowInvalidCertificates = true;
+              clientOptions.tlsAllowInvalidHostnames = true;
+            }
+            
+            client = new MongoClient(workerData.connectionString, clientOptions);
             
             await client.connect();
             

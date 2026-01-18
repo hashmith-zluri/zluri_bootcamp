@@ -1,5 +1,6 @@
-// Sample script to get all users from MongoDB
+// MongoDB Atlas script to get all users from the users collection
 async function getAllUsers() {
+  console.log('Testing MongoDB Atlas connection...');
   console.log('Fetching all users from MongoDB...');
   
   try {
@@ -15,16 +16,26 @@ async function getAllUsers() {
       users.forEach((user, index) => {
         console.log(`User ${index + 1}:`, JSON.stringify(user, null, 2));
       });
+      
+      console.log('');
+      console.log('=== USER SUMMARY ===');
+      console.log('Active users:', users.filter(u => u.status === 'active').length);
+      console.log('Inactive users:', users.filter(u => u.status === 'inactive').length);
+      
+      // Show unique email domains
+      const domains = [...new Set(users.map(u => u.email?.split('@')[1]).filter(Boolean))];
+      console.log('Email domains:', domains.join(', '));
+      
     } else {
       console.log('No users found in the collection.');
     }
     
     console.log('');
-    console.log('Query completed successfully!');
+    console.log('MongoDB script executed successfully!');
     
   } catch (error) {
-    console.log('Failed to fetch users:', error.message);
+    console.log('Error:', error.message);
   }
 }
 
-getAllUsers();
+await getAllUsers();

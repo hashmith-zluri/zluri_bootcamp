@@ -5,24 +5,43 @@ const mongoClients = new Map();
 const createMongoConnection = async (instanceConfig) => {
   const { host, port, database, username, password } = instanceConfig;
   
-  // Build MongoDB connection string
-  let connectionString = 'mongodb://';
+  let connectionString;
   
-  if (username && password) {
-    connectionString += `${username}:${password}@`;
+  // Check if this is a MongoDB Atlas connection (contains mongodb.net)
+  if (host && host.includes('mongodb.net')) {
+    // Atlas connection string format - encode password for URL safety
+    const encodedPassword = encodeURIComponent(password);
+    connectionString = `mongodb+srv://${username}:${encodedPassword}@${host}`;
+    if (database) {
+      connectionString += `/${database}`;
+    }
+    connectionString += '?retryWrites=true&w=majority&appName=mongo-1';
+  } else {
+    // Local MongoDB connection string format
+    connectionString = 'mongodb://';
+    
+    if (username && password) {
+      connectionString += `${username}:${password}@`;
+    }
+    
+    connectionString += `${host || 'localhost'}:${port || 27017}`;
+    
+    if (database) {
+      connectionString += `/${database}`;
+    }
   }
   
-  connectionString += `${host || 'localhost'}:${port || 27017}`;
-  
-  if (database) {
-    connectionString += `/${database}`;
-  }
+  console.log(`Creating MongoDB connection to: ${host}`);
   
   const client = new MongoClient(connectionString, {
     maxPoolSize: 5,
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 30000,
-    maxIdleTimeMS: 300000
+    maxIdleTimeMS: 300000,
+    // Add TLS configuration for Atlas
+    tls: host && host.includes('mongodb.net'),
+    tlsAllowInvalidCertificates: true,
+    tlsAllowInvalidHostnames: true
   });
   
   await client.connect();

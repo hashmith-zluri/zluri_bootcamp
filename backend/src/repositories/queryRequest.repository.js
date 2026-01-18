@@ -50,7 +50,7 @@ class QueryRequestRepository {
    */
   async findWithInstance(requestId) {
     const result = await query(
-      `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine
+      `SELECT qr.*, di.name as instance_name, di.host, di.port, di.engine, di.username, di.password
        FROM query_requests qr 
        JOIN db_instances di ON qr.db_instance_id = di.id 
        WHERE qr.id = $1`,
