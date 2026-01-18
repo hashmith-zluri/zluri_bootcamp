@@ -8,6 +8,9 @@ import {
   REQUEST_TYPES,
 } from '../../src/utils/constants';
 
+// Set test environment
+process.env.NODE_ENV = 'test';
+
 describe('Constants', () => {
   describe('ROLES', () => {
     it('should have correct role definitions', () => {
@@ -22,8 +25,17 @@ describe('Constants', () => {
   });
 
   describe('API_BASE_URL', () => {
-    it('should have correct API base URL', () => {
-      expect(API_BASE_URL).toBe('http://localhost:4000/api');
+    it('should have correct API base URL fallback', () => {
+      // Since this uses environment variables, we test the fallback value
+      expect(API_BASE_URL).toBe('https://zluribootcamp-production.up.railway.app/api/v1');
+    });
+
+    it('should be a string', () => {
+      expect(typeof API_BASE_URL).toBe('string');
+    });
+
+    it('should contain api/v1 path', () => {
+      expect(API_BASE_URL).toContain('/api/v1');
     });
   });
 

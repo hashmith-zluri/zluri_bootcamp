@@ -1,4 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://zluribootcamp-production.up.railway.app/api/v1';
+
+const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+
+// Get API base URL safely
+let API_BASE_URL;
+if (isTest) {
+  API_BASE_URL = 'https://zluribootcamp-production.up.railway.app/api/v1';
+} else {
+  try {
+    API_BASE_URL = eval('import.meta.env.VITE_API_BASE_URL') || 'https://zluribootcamp-production.up.railway.app/api/v1';
+  } catch (e) {
+    API_BASE_URL = 'https://zluribootcamp-production.up.railway.app/api/v1';
+  }
+}
 
 // Get auth token from localStorage
 const getToken = () => localStorage.getItem('token');

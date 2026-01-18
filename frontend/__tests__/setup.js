@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
 
+// Set test environment
+process.env.NODE_ENV = 'test';
+
 // Polyfill TextEncoder/TextDecoder for react-router-dom
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;

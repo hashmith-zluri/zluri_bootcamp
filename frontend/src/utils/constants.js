@@ -1,10 +1,26 @@
+// Check if we're in test environment and use fallback
+const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+
+// Get API base URL safely
+let API_BASE_URL;
+if (isTest) {
+  API_BASE_URL = 'https://zluribootcamp-production.up.railway.app/api/v1';
+} else {
+  try {
+    // Use eval to hide import.meta from Jest parser
+    API_BASE_URL = eval('import.meta.env.VITE_API_BASE_URL') || 'https://zluribootcamp-production.up.railway.app/api/v1';
+  } catch (e) {
+    API_BASE_URL = 'https://zluribootcamp-production.up.railway.app/api/v1';
+  }
+}
+
 export const ROLES = {
   DEVELOPER: 'DEVELOPER',
   MANAGER: 'MANAGER',
   ADMIN: 'ADMIN'
 };
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://zluribootcamp-production.up.railway.app/api/v1';
+export { API_BASE_URL };
 
 // Role-based access control
 export const ROLE_ACCESS = {
