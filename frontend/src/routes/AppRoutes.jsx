@@ -4,7 +4,7 @@ import SubmitRequest from "../pages/SubmitRequest";
 import ApprovalDashboard from "../pages/ApprovalDashboard";
 import MySubmissions from "../pages/MySubmissions";
 import NotAuthorized from "../pages/NotAuthorized";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import DashboardLayout from "../components/layout/dashboardlayout";
 import ProtectedRoute from "../components/common/ProtectedRoute";
 import { ROLE_ACCESS } from "../utils/constants";
 
