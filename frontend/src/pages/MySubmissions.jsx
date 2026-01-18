@@ -145,7 +145,55 @@ export default function MySubmissions() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+    if (!dateString) {
+      // Use current time if no date provided
+      return new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+    }
+    
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid, if not use current time
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZoneName: 'short'
+        });
+      }
+      
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+    } catch (error) {
+      // Use current time for any errors
+      return new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+    }
   };
 
   if (loading) {
@@ -243,14 +291,13 @@ export default function MySubmissions() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pod</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   {loading ? 'Loading...' : 'No requests found'}
                 </td>
               </tr>
@@ -284,9 +331,6 @@ export default function MySubmissions() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={request.status} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(request.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex gap-2">
@@ -458,9 +502,6 @@ export default function MySubmissions() {
             {/* Timestamps - moved to bottom */}
             <div className="text-xs text-gray-500 pt-4 border-t space-y-1">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-medium">Created:</span> {formatDate(selectedRequest.created_at)}
-                </div>
                 {selectedRequest.approved_at && (
                   <div>
                     <span className="font-medium">Approved:</span> {formatDate(selectedRequest.approved_at)}

@@ -9,8 +9,8 @@ class QueryRequestRepository {
   async create(data) {
     const result = await query(
       `INSERT INTO query_requests
-        (requester_id, db_instance_id, database_name, query_text, script_path, comments, pod_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
+        (requester_id, db_instance_id, database_name, query_text, script_path, comments, pod_id, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', NOW())
        RETURNING id, status`,
       [data.userId, data.instanceId, data.dbName, data.queryText, data.scriptContent, data.comments, data.podId]
     );

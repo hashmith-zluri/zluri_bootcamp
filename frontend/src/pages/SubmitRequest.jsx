@@ -313,7 +313,7 @@ export default function SubmitRequest() {
   }
 }
 
-yourFunction();`}
+await yourFunction();`}
         language="javascript"
         readOnly={true}
         showLineNumbers={false}
@@ -340,7 +340,7 @@ yourFunction();`}
   }
 }
 
-yourFunction();`}
+await yourFunction();`}
         language="javascript"
         readOnly={true}
         showLineNumbers={false}

@@ -14,8 +14,8 @@ class ExecutionLogRepository {
   async create(logData) {
     const result = await query(
       `INSERT INTO execution_logs 
-       (request_id, success, output, error, execution_time_ms) 
-       VALUES ($1, $2, $3, $4, $5) 
+       (request_id, success, output, error, execution_time_ms, executed_at) 
+       VALUES ($1, $2, $3, $4, $5, NOW()) 
        RETURNING id`,
       [logData.requestId, logData.success, logData.output, logData.error, logData.executionTimeMs]
     );

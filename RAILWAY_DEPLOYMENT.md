@@ -44,12 +44,37 @@ SLACK_APPROVAL_CHANNEL=your-slack-channel-id
 SLACK_ADMIN_EMAIL=your-admin-email
 ```
 
-### 4. Deploy
+### 4. Run Database Migration (Important!)
+After deployment, you need to run the timestamp migration:
+
+1. In Railway dashboard, go to your project
+2. Open the "Deploy" tab and find your latest deployment
+3. Click on the deployment and go to "Logs"
+4. You can run the migration by connecting to your database and running:
+
+```sql
+-- Run this in your Neon PostgreSQL database
+-- Migration: Fix timestamp handling to match approved_at pattern
+
+-- 1. Remove DEFAULT constraints from existing columns
+ALTER TABLE query_requests ALTER COLUMN created_at DROP DEFAULT;
+ALTER TABLE execution_logs ALTER COLUMN executed_at DROP DEFAULT;
+
+-- 2. Update any existing NULL timestamps to current time
+UPDATE query_requests SET created_at = NOW() WHERE created_at IS NULL;
+UPDATE execution_logs SET executed_at = NOW() WHERE executed_at IS NULL;
+
+-- 3. Make the columns NOT NULL since they should always have values
+ALTER TABLE query_requests ALTER COLUMN created_at SET NOT NULL;
+ALTER TABLE execution_logs ALTER COLUMN executed_at SET NOT NULL;
+```
+
+### 5. Deploy
 1. Railway will automatically build and deploy
 2. You'll get a URL like `https://your-app-name.railway.app`
 3. Test the health endpoint: `https://your-app-name.railway.app/health`
 
-### 5. Update Frontend
+### 6. Update Frontend
 Update your frontend to use the deployed backend URL:
 
 ```javascript

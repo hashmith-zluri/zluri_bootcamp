@@ -29,7 +29,7 @@ CREATE TABLE query_requests (
     CHECK (status IN ('PENDING','APPROVED','REJECTED','EXECUTING','EXECUTED','FAILED'))DEFAULT 'PENDING',
   approved_by INT REFERENCES users(id) ON DELETE SET NULL,
   approved_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP,
   CONSTRAINT valid_request_payload CHECK (
     (query_text IS NOT NULL AND script_path IS NULL)
     OR
@@ -40,7 +40,7 @@ CREATE TABLE query_requests (
 CREATE TABLE execution_logs (
   id SERIAL PRIMARY KEY,
   request_id INT REFERENCES query_requests(id),
-  executed_at TIMESTAMP DEFAULT NOW(),
+  executed_at TIMESTAMP,
   success BOOLEAN NOT NULL,
   output TEXT,
   error TEXT,

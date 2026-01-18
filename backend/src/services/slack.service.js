@@ -6,6 +6,7 @@ class SlackService {
     this.enabled = process.env.SLACK_ENABLED === 'true';
     this.approvalChannel = process.env.SLACK_APPROVAL_CHANNEL;
     this.adminEmail = process.env.SLACK_ADMIN_EMAIL || 'hashmith.b@zluri.com';
+    this.frontendUrl = process.env.FRONTEND_URL || 'https://zluri-database-query-frontend.vercel.app';
     
     if (this.enabled) {
       this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
@@ -168,6 +169,9 @@ class SlackService {
           Blocks.Section({ 
             text: `*Execution Results:*\n\`\`\`${outputPreview}\`\`\`` 
           }),
+          Blocks.Section({
+            text: `*🔗 Full Preview URL:*\n${this.frontendUrl}/my-submissions`
+          }),
           Blocks.Context().elements(
             `✓ Executed successfully at ${new Date().toLocaleString()}`
           )
@@ -229,6 +233,9 @@ class SlackService {
             ),
           Blocks.Section({ 
             text: `*Error Message:*\n\`\`\`${errorPreview}\`\`\`` 
+          }),
+          Blocks.Section({
+            text: `*🔗 Full Preview URL:*\n${this.frontendUrl}/my-submissions`
           }),
           Blocks.Context().elements(
             `Failed at ${new Date().toLocaleString()}`
