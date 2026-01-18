@@ -6,7 +6,7 @@ class SlackService {
     this.enabled = process.env.SLACK_ENABLED === 'true';
     this.approvalChannel = process.env.SLACK_APPROVAL_CHANNEL;
     this.adminEmail = process.env.SLACK_ADMIN_EMAIL || 'hashmith.b@zluri.com';
-    this.frontendUrl = process.env.FRONTEND_URL || 'https://zluri-bootcamp-fvcnlebh3-hashmiths-projects.vercel.app';
+    this.frontendUrl = process.env.FRONTEND_URL || 'https://zluri-bootcamp.vercel.app';
     
     if (this.enabled) {
       this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
