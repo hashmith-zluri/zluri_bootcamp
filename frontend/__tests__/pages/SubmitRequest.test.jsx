@@ -1264,7 +1264,7 @@ describe('SubmitRequest', () => {
     });
   });
 
-  it('should handle file larger than 16MB', async () => {
+  it('should handle file larger than 5MB', async () => {
     const user = userEvent.setup();
     
     dbAPI.getInstances.mockResolvedValue({
@@ -1291,12 +1291,12 @@ describe('SubmitRequest', () => {
     });
     
     // Create a large file (mock size)
-    const largeContent = 'x'.repeat(17 * 1024 * 1024); // 17MB
+    const largeContent = 'x'.repeat(6 * 1024 * 1024); // 6MB
     const file = new File([largeContent], 'large.js', { type: 'text/javascript' });
     
     // Mock the size property
     Object.defineProperty(file, 'size', {
-      value: 17 * 1024 * 1024,
+      value: 6 * 1024 * 1024,
       writable: false,
     });
     
@@ -1311,7 +1311,7 @@ describe('SubmitRequest', () => {
     fileInput.dispatchEvent(changeEvent);
     
     await waitFor(() => {
-      expect(screen.getByText(/File size must be less than 16MB/)).toBeInTheDocument();
+      expect(screen.getByText(/File size must be less than 5MB/)).toBeInTheDocument();
     });
   });
 

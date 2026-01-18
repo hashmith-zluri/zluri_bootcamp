@@ -203,8 +203,8 @@ export default function SubmitRequest() {
         e.target.value = '';
         return;
       }
-      if (file.size > 16 * 1024 * 1024) { // 16MB limit
-        toast.error('File size must be less than 16MB');
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('File size must be less than 5MB');
         e.target.value = '';
         return;
       }

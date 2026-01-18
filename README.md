@@ -38,7 +38,7 @@
         - Either query (text) OR script (file) must be provided, not both
         - Script file requirements:
             - Only .js files allowed
-            - Maximum file size: 16MB
+            - Maximum file size: 5MB
             - Stored in memory (not on disk)
             - Single file per request
         - Returns: req_id and status (PENDING)

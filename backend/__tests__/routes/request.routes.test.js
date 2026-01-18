@@ -32,8 +32,8 @@ describe('Request Routes - File Upload', () => {
     });
 
     it('should handle file size limit error', async () => {
-      // Create a buffer larger than 16MB
-      const largeBuffer = Buffer.alloc(17 * 1024 * 1024, 'x');
+      // Create a buffer larger than 5MB
+      const largeBuffer = Buffer.alloc(6 * 1024 * 1024, 'x');
       
       const response = await request(app)
         .post('/api/v1/request')

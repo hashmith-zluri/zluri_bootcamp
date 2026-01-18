@@ -26,7 +26,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 16 * 1024 * 1024,
+    fileSize: 5 * 1024 * 1024, // 5MB limit
     files: 1
   },
   fileFilter: fileFilter
@@ -41,7 +41,7 @@ const smartUploadMiddleware = (req, res, next) => {
     
     // Multer error handling with lookup map
     const multerErrors = {
-      'LIMIT_FILE_SIZE': 'File too large. Maximum size is 16MB.',
+      'LIMIT_FILE_SIZE': 'File too large. Maximum size is 5MB.',
       'LIMIT_FILE_COUNT': 'Too many files. Only one file allowed.'
     };
     

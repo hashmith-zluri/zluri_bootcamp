@@ -136,7 +136,7 @@ Potential downsides (minimal impact):
 
 1. Database size
    - Scripts stored as TEXT increase DB size
-   - With 16MB limit per script, this is manageable
+   - With 5MB limit per script, this is manageable
    - Most scripts are small (few KB)
 
 2. Memory usage
@@ -290,7 +290,7 @@ answer:
 - Timeout enforcement (can terminate worker)
 - No direct database credential access in scripts
 - File type restriction (.js only)
-- File size limit (16MB)
+- File size limit (5MB)
 - Script stored in DB, not filesystem
 - Manager approval required before execution (primary security gate)
 
