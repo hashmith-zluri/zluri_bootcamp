@@ -5,7 +5,7 @@ import ApprovalDashboard from "../pages/ApprovalDashboard";
 import MySubmissions from "../pages/MySubmissions";
 import NotAuthorized from "../pages/NotAuthorized";
 import DashboardLayout from "../components/layout/dashboardlayout";
-import ProtectedRoute from "../components/common/ProtectedRoute";
+import ProtectedRoute from "../components/common/protectedroute";
 import { ROLE_ACCESS } from "../utils/constants";
 
 function RoleProtectedRoute({ children, allowedRoles }) {
