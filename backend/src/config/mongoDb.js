@@ -37,11 +37,23 @@ const createMongoConnection = async (instanceConfig) => {
     maxPoolSize: 5,
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 30000,
-    maxIdleTimeMS: 300000,
-    // Add TLS configuration for Atlas
+    maxIdleTimeoutMS: 300000,
+    // Enhanced TLS configuration for Atlas in production
     tls: host && host.includes('mongodb.net'),
     tlsAllowInvalidCertificates: true,
-    tlsAllowInvalidHostnames: true
+    tlsAllowInvalidHostnames: true,
+    // Additional SSL options for Railway/production environments
+    ssl: host && host.includes('mongodb.net'),
+    sslValidate: false,
+    // Connection retry options
+    retryWrites: true,
+    retryReads: true,
+    // Use stable API version for Atlas
+    serverApi: host && host.includes('mongodb.net') ? {
+      version: '1',
+      strict: false,
+      deprecationErrors: false
+    } : undefined
   });
   
   await client.connect();
