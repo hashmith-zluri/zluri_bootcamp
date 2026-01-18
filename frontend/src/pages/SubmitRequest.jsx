@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { querySubmissionSchema } from '../utils/validation';
 import { dbAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
-import { PODS, DB_TYPES, REQUEST_TYPES } from '../utils/constants';
+import { PODS, DB_TYPES, REQUEST_TYPES, API_BASE_URL } from '../utils/constants';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import CodeEditor from '../components/common/CodeEditor';
 
@@ -261,7 +261,7 @@ export default function SubmitRequest() {
       }
 
       // Use fetch directly for FormData
-      const response = await fetch('http://localhost:4000/api/v1/request', {
+      const response = await fetch(`${API_BASE_URL}/request`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
