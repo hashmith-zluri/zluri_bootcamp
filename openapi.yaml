@@ -1,23 +1,14 @@
 openapi: 3.0.3
 info:
-  title: Database Query Management & Risk Assessment API
+  title: Database Query Management API
   description: |
-    A comprehensive API for managing database query requests with built-in risk assessment capabilities.
+    A comprehensive API for managing database query requests with approval workflow.
     
     ## Features
     - **Multi-Database Support**: PostgreSQL and MongoDB
-    - **Advanced Risk Assessment**: AST-based SQL analysis and pattern-based security detection
     - **Approval Workflow**: Manager approval system for database operations
     - **Audit Trail**: Complete logging of all database operations
-    - **Security-First**: Built-in detection of dangerous operations and injection attacks
-    
-    ## Risk Assessment System
-    The API includes a sophisticated risk assessment system that:
-    - Uses Abstract Syntax Tree (AST) parsing for SQL queries
-    - Detects dangerous operations (DROP, TRUNCATE, DELETE without WHERE)
-    - Identifies JavaScript security patterns (eval, $where, dynamic functions)
-    - Handles MongoDB-specific injection patterns
-    - Provides comprehensive security recommendations
+    - **Security-First**: Built-in validation and access control
     
     ## Authentication
     All endpoints require JWT authentication via Bearer token.
@@ -31,9 +22,9 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: http://localhost:3000/api
+  - url: http://localhost:3000/api/v1
     description: Development server
-  - url: https://api.example.com/api
+  - url: https://zluri-bootcamp-backend.up.railway.app/api/v1
     description: Production server
 
 security:
@@ -214,12 +205,6 @@ paths:
       description: |
         Submit a new database query or script request for approval.
         
-        ## Risk Assessment
-        All requests are automatically analyzed for security risks:
-        - **SQL Queries**: AST-based analysis detects dangerous operations
-        - **Scripts**: Pattern analysis identifies security vulnerabilities
-        - **Risk Levels**: Critical, High, Medium, Low with detailed reasons
-        
         ## Request Types
         - **Query**: Direct SQL/MongoDB query execution
         - **Script**: JavaScript code with database operations
@@ -282,13 +267,6 @@ paths:
                     success: true
                     req_id: "123"
                     status: "PENDING"
-                    riskAssessment:
-                      level: "critical"
-                      score: 6
-                      reasons: ["DROP operation - permanently deletes data"]
-                      recommendations: 
-                        - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
-                        - "🔒 Consider requiring additional approval for execution"
         '400':
           description: Invalid request data
           content:
@@ -328,10 +306,6 @@ paths:
                         requester_name: "Dev1"
                         instance_name: "local-postgres"
                         database_type: "POSTGRES"
-                        riskAssessment:
-                          level: "low"
-                          score: 0
-                          reasons: ["Read-only operation - safe to execute"]
                         result:
                           output: "Query executed successfully. 1 rows returned.\n\n[{\"id\": 1, \"email\": \"john@example.com\", \"name\": \"John Doe\"}]"
                           response_time: 3
@@ -400,13 +374,6 @@ paths:
       summary: Get pending approval requests
       description: |
         Retrieve all pending requests for the manager's assigned pods.
-        
-        ## Risk Assessment Integration
-        Each request includes comprehensive risk assessment data to help managers make informed approval decisions:
-        - **Risk Level**: Critical, High, Medium, Low
-        - **Risk Score**: Numerical score (0-10+)
-        - **Detailed Reasons**: Specific security concerns identified
-        - **Recommendations**: Actionable security guidance
       responses:
         '200':
           description: Approval requests retrieved successfully
@@ -416,7 +383,7 @@ paths:
                 $ref: '#/components/schemas/ApprovalRequestsResponse'
               examples:
                 pending_requests:
-                  summary: Pending approval requests with risk assessment
+                  summary: Pending approval requests
                   value:
                     success: true
                     requests:
@@ -432,14 +399,6 @@ paths:
                         requester_name: "Dev1"
                         instance_name: "local-postgres"
                         database_type: "POSTGRES"
-                        riskAssessment:
-                          level: "critical"
-                          score: 6
-                          reasons: ["DROP operation - permanently deletes data"]
-                          recommendations:
-                            - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
-                            - "🔒 Consider requiring additional approval for execution"
-                            - "📋 Ensure you have a backup before proceeding"
 
   /approvals/{reqId}/action:
     post:
@@ -448,13 +407,6 @@ paths:
       summary: Approve or reject request
       description: |
         Approve or reject a pending request.
-        
-        ## Security Considerations
-        Managers should carefully review the risk assessment before approving:
-        - **Critical Risk**: Requires senior developer review
-        - **High Risk**: Verify WHERE clauses and conditions
-        - **Medium Risk**: Standard review recommended
-        - **Low Risk**: Safe to execute
       parameters:
         - name: reqId
           in: path
@@ -498,133 +450,6 @@ paths:
                     success: true
                     status: "reject"
                     reason: "Query needs modification before approval"
-
-  # Risk Assessment Endpoints
-  /risk/assess:
-    post:
-      tags:
-        - Risk Assessment
-      summary: Analyze query/script risk
-      description: |
-        Perform comprehensive risk assessment on SQL queries or JavaScript scripts.
-        
-        ## Analysis Methods
-        - **SQL Queries**: AST-based structural analysis
-        - **JavaScript Scripts**: Pattern-based security analysis
-        - **MongoDB Operations**: NoSQL injection detection
-        
-        ## Risk Levels
-        - **Critical (6+ points)**: Immediate danger operations (DROP, TRUNCATE)
-        - **High (4-5 points)**: Significant risk operations (ALTER, GRANT)
-        - **Medium (2-3 points)**: Standard operations with some risk (UPDATE, INSERT)
-        - **Low (0-1 points)**: Safe read-only operations (SELECT, FIND)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RiskAssessmentRequest'
-            examples:
-              sql_query:
-                summary: SQL Query Analysis
-                value:
-                  query: "DROP TABLE users;"
-                  dbType: "POSTGRES"
-              javascript_script:
-                summary: JavaScript Script Analysis
-                value:
-                  script: "async function deleteUsers() { await query('DELETE FROM users WHERE active = false'); }"
-                  dbType: "POSTGRES"
-              mongodb_query:
-                summary: MongoDB Query Analysis
-                value:
-                  script: "db.collection('users').deleteMany({})"
-                  dbType: "MONGO"
-      responses:
-        '200':
-          description: Risk assessment completed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RiskAssessmentResponse'
-              examples:
-                critical_risk:
-                  summary: Critical Risk Detection
-                  value:
-                    success: true
-                    assessment:
-                      level: "critical"
-                      score: 6
-                      reasons: ["DROP operation - permanently deletes data"]
-                      recommendations:
-                        - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
-                        - "🔒 Consider requiring additional approval for execution"
-                        - "📋 Ensure you have a backup before proceeding"
-                        - "⏰ Execute during maintenance window if possible"
-                      analysis:
-                        method: "sql-ast"
-                        astUsed: true
-                        detailedRisks:
-                          - type: "critical"
-                            reason: "DROP table - permanently deletes data"
-                            location: "root"
-                low_risk:
-                  summary: Low Risk Detection
-                  value:
-                    success: true
-                    assessment:
-                      level: "low"
-                      score: 0
-                      reasons: ["Read-only operation - safe to execute"]
-                      recommendations:
-                        - "✅ LOW RISK: Safe to execute"
-                      analysis:
-                        method: "sql-ast"
-                        astUsed: true
-
-  /risk/validate-syntax:
-    post:
-      tags:
-        - Risk Assessment
-      summary: Validate SQL syntax
-      description: Validate SQL query syntax without executing it
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SyntaxValidationRequest'
-            examples:
-              valid_sql:
-                summary: Valid SQL Query
-                value:
-                  sql: "SELECT * FROM users WHERE id = 1"
-                  dbType: "POSTGRES"
-              invalid_sql:
-                summary: Invalid SQL Query
-                value:
-                  sql: "SELECT * FROM WHERE INVALID"
-                  dbType: "POSTGRES"
-      responses:
-        '200':
-          description: Syntax validation completed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SyntaxValidationResponse'
-              examples:
-                valid:
-                  summary: Valid syntax
-                  value:
-                    success: true
-                    valid: true
-                    error: null
-                invalid:
-                  summary: Invalid syntax
-                  value:
-                    success: true
-                    valid: false
-                    error: "Syntax error: Expected table name after FROM"
 
 components:
   securitySchemes:
@@ -796,8 +621,6 @@ components:
           type: string
           enum: [PENDING]
           example: "PENDING"
-        riskAssessment:
-          $ref: '#/components/schemas/RiskAssessment'
 
     UserRequestsResponse:
       type: object
@@ -861,8 +684,6 @@ components:
           type: string
           enum: [POSTGRES, MONGO]
           example: "POSTGRES"
-        riskAssessment:
-          $ref: '#/components/schemas/RiskAssessment'
         result:
           $ref: '#/components/schemas/ExecutionResult'
           nullable: true
@@ -965,8 +786,6 @@ components:
         database_type:
           type: string
           enum: [POSTGRES, MONGO]
-        riskAssessment:
-          $ref: '#/components/schemas/RiskAssessment'
 
     ApprovalActionRequest:
       type: object
@@ -997,135 +816,6 @@ components:
           type: string
           nullable: true
           description: Rejection reason (only present if rejected)
-
-    # Risk Assessment Schemas
-    RiskAssessmentRequest:
-      type: object
-      properties:
-        query:
-          type: string
-          nullable: true
-          description: SQL or MongoDB query to analyze
-          example: "DROP TABLE users;"
-        script:
-          type: string
-          nullable: true
-          description: JavaScript code to analyze
-          example: "async function deleteUsers() { await query('DELETE FROM users'); }"
-        dbType:
-          type: string
-          enum: [POSTGRES, MONGO, MYSQL]
-          description: Database type for analysis context
-          example: "POSTGRES"
-
-    RiskAssessmentResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        assessment:
-          $ref: '#/components/schemas/RiskAssessment'
-
-    RiskAssessment:
-      type: object
-      properties:
-        level:
-          type: string
-          enum: [low, medium, high, critical]
-          description: Overall risk level
-          example: "critical"
-        score:
-          type: integer
-          description: Numerical risk score
-          example: 6
-        reasons:
-          type: array
-          items:
-            type: string
-          description: List of identified security concerns
-          example: ["DROP operation - permanently deletes data"]
-        recommendations:
-          type: array
-          items:
-            type: string
-          description: Security recommendations and best practices
-          example: 
-            - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
-            - "🔒 Consider requiring additional approval for execution"
-        analysis:
-          $ref: '#/components/schemas/RiskAnalysisMetadata'
-
-    RiskAnalysisMetadata:
-      type: object
-      properties:
-        method:
-          type: string
-          enum: [sql-ast, javascript, none, error]
-          description: Analysis method used
-          example: "sql-ast"
-        astUsed:
-          type: boolean
-          description: Whether AST parsing was used
-          example: true
-        fallbackUsed:
-          type: boolean
-          description: Whether fallback analysis was used
-          example: false
-        parseError:
-          type: string
-          nullable: true
-          description: Parse error if AST analysis failed
-        detailedRisks:
-          type: array
-          items:
-            $ref: '#/components/schemas/DetailedRisk'
-
-    DetailedRisk:
-      type: object
-      properties:
-        type:
-          type: string
-          enum: [low, medium, high, critical]
-          example: "critical"
-        reason:
-          type: string
-          example: "DROP table - permanently deletes data"
-        location:
-          type: string
-          description: Location in code where risk was detected
-          example: "root"
-
-    SyntaxValidationRequest:
-      type: object
-      required:
-        - sql
-        - dbType
-      properties:
-        sql:
-          type: string
-          description: SQL query to validate
-          example: "SELECT * FROM users WHERE id = 1"
-        dbType:
-          type: string
-          enum: [POSTGRES, MYSQL]
-          description: Database type for syntax validation
-          example: "POSTGRES"
-
-    SyntaxValidationResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        valid:
-          type: boolean
-          description: Whether the SQL syntax is valid
-          example: true
-        error:
-          type: string
-          nullable: true
-          description: Syntax error message if invalid
 
     # Common Schemas
     SuccessResponse:
@@ -1162,5 +852,3 @@ tags:
     description: Query and script request submission and tracking
   - name: Approval Management
     description: Manager approval workflow for database operations
-  - name: Risk Assessment
-    description: Security analysis and risk assessment for queries and scripts
