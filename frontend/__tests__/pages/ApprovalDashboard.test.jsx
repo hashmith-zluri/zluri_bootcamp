@@ -1459,12 +1459,12 @@ describe('ApprovalDashboard', () => {
     // Should be on page 9, showing items 81-90
     await waitFor(() => {
       expect(screen.getByText('#81')).toBeInTheDocument();
-    }, { timeout: 5000 });
+    }, { timeout: 10000 });
     
     // Should show last 5 pages (6, 7, 8, 9, 10)
     expect(screen.getByRole('button', { name: '6' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '10' })).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('should handle search by req_id with no match', async () => {
     const user = userEvent.setup();

@@ -607,6 +607,43 @@ describe('Slack Service', () => {
       await expect(slackService.notifyNewSubmission(mockRequestData)).resolves.not.toThrow();
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
     });
+
+    it('should send notification when enabled with query', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      
+      // Should not throw
+      await expect(slackService.notifyNewSubmission(mockRequestData)).resolves.not.toThrow();
+    });
+
+    it('should send notification when enabled with script', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      
+      const scriptData = { ...mockRequestData, query: null, script: 'console.log("test")' };
+      
+      // Should not throw
+      await expect(slackService.notifyNewSubmission(scriptData)).resolves.not.toThrow();
+    });
+
+    it('should handle missing requester name', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      
+      const dataWithoutName = { ...mockRequestData, requester_name: null };
+      
+      // Should not throw
+      await expect(slackService.notifyNewSubmission(dataWithoutName)).resolves.not.toThrow();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      mockClient.chat.postMessage.mockRejectedValue(new Error('API Error'));
+      
+      // Should not throw
+      await expect(slackService.notifyNewSubmission(mockRequestData)).resolves.not.toThrow();
+    });
   });
 
   describe('notifyApprovalSuccess', () => {
@@ -639,6 +676,44 @@ describe('Slack Service', () => {
       await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
     });
+
+    it('should send notification to channel when enabled', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+    });
+
+    it('should send notification without admin DM when admin not found', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue(null);
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+    });
+
+    it('should handle script execution results', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      const scriptData = { ...mockRequestData, query: null, script: 'console.log("test")' };
+      const scriptResult = { output: 'Script completed', executionTime: 100 };
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalSuccess(scriptData, scriptResult)).resolves.not.toThrow();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      mockClient.chat.postMessage.mockRejectedValue(new Error('API Error'));
+      
+      await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+    });
   });
 
   describe('notifyApprovalFailure', () => {
@@ -667,6 +742,54 @@ describe('Slack Service', () => {
       
       await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('should send notification to channel when enabled', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+    });
+
+    it('should send notification without admin DM when admin not found', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue(null);
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+    });
+
+    it('should handle missing error message', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      const resultWithoutError = {};
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalFailure(mockRequestData, resultWithoutError)).resolves.not.toThrow();
+    });
+
+    it('should handle script failure', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      const scriptData = { ...mockRequestData, query: null, script: 'console.log("test")' };
+      
+      // Should not throw
+      await expect(slackService.notifyApprovalFailure(scriptData, mockExecutionResult)).resolves.not.toThrow();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      mockClient.chat.postMessage.mockRejectedValue(new Error('API Error'));
+      
+      await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
     });
   });
 
@@ -708,6 +831,46 @@ describe('Slack Service', () => {
       await slackService.notifyRejection(mockRequestData, rejectionReason);
       
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('should send DM to admin when enabled and admin found', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      // Should not throw
+      await expect(slackService.notifyRejection(mockRequestData, rejectionReason)).resolves.not.toThrow();
+    });
+
+    it('should handle script rejection', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      const scriptData = { ...mockRequestData, query: null, script: 'dangerous.script()' };
+      
+      // Should not throw
+      await expect(slackService.notifyRejection(scriptData, rejectionReason)).resolves.not.toThrow();
+    });
+
+    it('should handle missing requester name', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      
+      const dataWithoutName = { ...mockRequestData, requester_name: null };
+      
+      // Should not throw
+      await expect(slackService.notifyRejection(dataWithoutName, rejectionReason)).resolves.not.toThrow();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      slackService = createService(true);
+      slackService.client = mockClient;
+      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('U12345');
+      mockClient.chat.postMessage.mockRejectedValue(new Error('API Error'));
+      
+      await expect(slackService.notifyRejection(mockRequestData, rejectionReason)).resolves.not.toThrow();
     });
   });
 });

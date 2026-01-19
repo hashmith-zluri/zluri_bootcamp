@@ -37,6 +37,37 @@ describe('Constants', () => {
     it('should contain api/v1 path', () => {
       expect(API_BASE_URL).toContain('/api/v1');
     });
+
+    it('should handle non-test environment', () => {
+      // Test the non-test environment branch by temporarily changing NODE_ENV
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      
+      // Re-import to trigger the conditional logic
+      jest.resetModules();
+      const { API_BASE_URL: devApiUrl } = require('../../src/utils/constants');
+      
+      expect(typeof devApiUrl).toBe('string');
+      expect(devApiUrl).toContain('/api/v1');
+      
+      // Restore original environment
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should handle undefined process environment', () => {
+      // Test the case where process is undefined
+      const originalProcess = global.process;
+      global.process = undefined;
+      
+      jest.resetModules();
+      const { API_BASE_URL: undefinedProcessUrl } = require('../../src/utils/constants');
+      
+      expect(typeof undefinedProcessUrl).toBe('string');
+      expect(undefinedProcessUrl).toContain('/api/v1');
+      
+      // Restore original process
+      global.process = originalProcess;
+    });
   });
 
   describe('ROLE_ACCESS', () => {

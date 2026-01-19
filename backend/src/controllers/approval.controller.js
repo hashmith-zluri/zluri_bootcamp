@@ -224,8 +224,7 @@ const approveOrReject = async (req, res) => {
         }
         
         return createSuccessResponse(res, { 
-          status: "approved",
-          execution: executionResult.success ? "queued" : "failed_to_start"
+          status: "approved"
         });
       },
       

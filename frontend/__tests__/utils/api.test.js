@@ -39,6 +39,42 @@ describe('API Utils', () => {
     window.location.href = '';
   });
 
+  describe('API Base URL Configuration', () => {
+    it('should use test environment URL when NODE_ENV is test', () => {
+      // This is already covered by the default test environment
+      expect(process.env.NODE_ENV).toBe('test');
+    });
+
+    it('should handle non-test environment', () => {
+      // Test the non-test environment branch by temporarily changing NODE_ENV
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      
+      // Re-import to trigger the conditional logic
+      jest.resetModules();
+      const { apiRequest: devApiRequest } = require('../../src/utils/api');
+      
+      expect(typeof devApiRequest).toBe('function');
+      
+      // Restore original environment
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should handle undefined process environment', () => {
+      // Test the case where process is undefined
+      const originalProcess = global.process;
+      global.process = undefined;
+      
+      jest.resetModules();
+      const { apiRequest: undefinedProcessApiRequest } = require('../../src/utils/api');
+      
+      expect(typeof undefinedProcessApiRequest).toBe('function');
+      
+      // Restore original process
+      global.process = originalProcess;
+    });
+  });
+
   describe('apiRequest', () => {
     it('should make successful API request', async () => {
       const mockData = { success: true, data: 'test' };
@@ -94,6 +130,18 @@ describe('API Utils', () => {
 
       await expect(apiRequest('/auth/login')).rejects.toThrow('Invalid credentials');
       // Should not call removeItem for login endpoint
+      expect(localStorageMock.removeItem).not.toHaveBeenCalled();
+    });
+
+    it('should handle 401 without token', async () => {
+      localStorageMock.getItem.mockReturnValue(null);
+      fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: 'Unauthorized' }),
+      });
+
+      await expect(apiRequest('/test')).rejects.toThrow('Unauthorized');
       expect(localStorageMock.removeItem).not.toHaveBeenCalled();
     });
 
@@ -167,6 +215,31 @@ describe('API Utils', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ data: 'test' }),
+        })
+      );
+    });
+
+    it('should merge custom headers with default headers', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+
+      await apiRequest('/test', { 
+        headers: { 
+          'Custom-Header': 'custom-value',
+          'Content-Type': 'application/xml' // Should override default
+        } 
+      });
+      
+      expect(fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Custom-Header': 'custom-value',
+            'Content-Type': 'application/xml',
+          }),
         })
       );
     });
@@ -338,6 +411,72 @@ describe('API Utils', () => {
           body: JSON.stringify({ action: 'reject', reason: 'Too risky' }),
         })
       );
+    });
+  });
+
+  describe('buildQueryParams edge cases', () => {
+    it('should handle empty params object', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({});
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/request/mine'), expect.any(Object));
+    });
+
+    it('should handle null values', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ status: null, sortBy: null, limit: null, offset: null });
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).toContain('/request/mine');
+      expect(callUrl).not.toContain('status=');
+      expect(callUrl).not.toContain('sortBy=');
+      expect(callUrl).not.toContain('limit=');
+      expect(callUrl).not.toContain('offset=');
+    });
+
+    it('should handle undefined values', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ 
+        status: undefined, 
+        sortBy: undefined, 
+        limit: undefined, 
+        offset: undefined 
+      });
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).toContain('/request/mine');
+      expect(callUrl).not.toContain('status=');
+      expect(callUrl).not.toContain('sortBy=');
+      expect(callUrl).not.toContain('limit=');
+      expect(callUrl).not.toContain('offset=');
+    });
+
+    it('should handle unknown parameters', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requests: [] }),
+      });
+
+      await requestAPI.getMyRequests({ 
+        unknownParam: 'value',
+        anotherParam: 123
+      });
+      const callUrl = fetch.mock.calls[0][0];
+      expect(callUrl).not.toContain('unknownParam=');
+      expect(callUrl).not.toContain('anotherParam=');
     });
   });
 

@@ -16,92 +16,212 @@ const sqlParsers = {
 };
 
 /**
- * Advanced comment removal with proper string literal handling
+ * Enhanced comment removal with string literal handling and no if loops
  * @param {string} content - Content to clean
  * @param {string} type - 'sql' or 'js'
  * @returns {string} - Content without comments
  */
 const removeComments = (content, type = 'sql') => {
-  const commentRules = {
+  // Input validation using switch and ternary operators
+  const validationResult = (() => {
+    switch (true) {
+      case !content:
+        return '';
+      case typeof content !== 'string':
+        return String(content);
+      case content.length === 0:
+        return '';
+      default:
+        return null; // Continue processing
+    }
+  })();
+  
+  // Return early validation result or continue
+  const shouldContinue = validationResult === null;
+  const finalContent = shouldContinue ? content : validationResult;
+  
+  return shouldContinue ? processContent(finalContent, type) : finalContent;
+};
+
+/**
+ * Process content to remove comments using various control structures
+ */
+const processContent = (content, type) => {
+  const commentPatterns = {
     sql: {
-      lineComment: '--',
-      blockStart: '/*',
-      blockEnd: '*/',
-      stringChars: ['"', "'", '`']
+      multiStart: '/*',
+      multiEnd: '*/',
+      singleStart: '--',
+      stringDelimiters: ['"', "'", '`']
     },
     js: {
-      lineComment: '//',
-      blockStart: '/*',
-      blockEnd: '*/',
-      stringChars: ['"', "'", '`']
+      multiStart: '/*',
+      multiEnd: '*/',
+      singleStart: '//',
+      stringDelimiters: ['"', "'", '`']
     }
   };
 
-  const rules = commentRules[type] || commentRules.sql;
+  const patterns = commentPatterns[type] || commentPatterns.sql;
   let result = '';
-  let inString = false;
-  let stringChar = '';
-  let inBlockComment = false;
-  let i = 0;
+  let position = 0;
   
-  while (i < content.length) {
-    const char = content[i];
-    
-    // Handle string literals
-    const isStringChar = rules.stringChars.includes(char);
-    const isEscaped = i > 0 && content[i - 1] === '\\';
-    
-    if (inBlockComment) {
-      // Look for block comment end - optimized substring check
-      if (content.substr(i, rules.blockEnd.length) === rules.blockEnd) {
-        inBlockComment = false;
-        i += rules.blockEnd.length;
-        continue;
-      }
-      i++;
-      continue;
-    }
-    
-    if (inString) {
-      if (char === stringChar && !isEscaped) {
-        inString = false;
-        stringChar = '';
-      }
-      result += char;
-      i++;
-      continue;
-    }
-    
-    // Not in string or block comment
-    if (isStringChar) {
-      inString = true;
-      stringChar = char;
-      result += char;
-      i++;
-      continue;
-    }
-    
-    if (content.substr(i, rules.blockStart.length) === rules.blockStart) {
-      inBlockComment = true;
-      i += rules.blockStart.length;
-      continue;
-    }
-    
-    if (content.substr(i, rules.lineComment.length) === rules.lineComment) {
-      // Skip to end of line
-      const nextNewline = content.indexOf('\n', i);
-      if (nextNewline === -1) {
-        break; // End of content
-      }
-      i = nextNewline;
-      continue;
-    }
-    
-    result += char;
-    i++;
-  }
+  // State management using object destructuring and spread
+  const createState = (overrides = {}) => ({
+    inString: false,
+    stringChar: '',
+    inMultiComment: false,
+    escapeNext: false,
+    ...overrides
+  });
   
-  return result;
+  let state = createState();
+
+  // Main processing loop using for...of with entries
+  const contentArray = Array.from(content);
+  
+  contentArray.forEach((currentChar, index) => {
+    const nextChar = contentArray[index + 1] || '';
+    const prevChar = contentArray[index - 1] || '';
+    
+    // Handle escape sequences using ternary and early return pattern
+    const handleEscapeSequence = () => {
+      const shouldHandleEscape = state.inString && state.escapeNext;
+      result += shouldHandleEscape ? currentChar : '';
+      state = shouldHandleEscape ? createState({ ...state, escapeNext: false }) : state;
+      return shouldHandleEscape;
+    };
+    
+    // Check for escape character using ternary
+    const handleEscapeChar = () => {
+      const isEscapeChar = state.inString && currentChar === '\\';
+      result += isEscapeChar ? currentChar : '';
+      state = isEscapeChar ? createState({ ...state, escapeNext: true }) : state;
+      return isEscapeChar;
+    };
+    
+    // Handle multi-line comment processing using switch
+    const handleMultiComment = () => {
+      const endPattern = patterns.multiEnd;
+      const isCommentEnd = content.substr(index, endPattern.length) === endPattern;
+      
+      switch (true) {
+        case isCommentEnd:
+          // Skip the end pattern characters
+          const skipCount = endPattern.length - 1;
+          Array.from({ length: skipCount }, (_, i) => {
+            contentArray[index + i + 1] = null; // Mark for skipping
+          });
+          state = createState({ ...state, inMultiComment: false });
+          return true;
+        default:
+          return true; // Skip character inside comment
+      }
+    };
+    
+    // Skip null characters (marked for skipping)
+    const shouldSkip = currentChar === null;
+    
+    // Process character based on current state using switch
+    const processCharacter = () => {
+      switch (true) {
+        case shouldSkip:
+          return;
+          
+        case handleEscapeSequence():
+          return;
+          
+        case handleEscapeChar():
+          return;
+          
+        case state.inMultiComment:
+          handleMultiComment();
+          return;
+          
+        default:
+          processNormalCharacter(currentChar, nextChar, patterns);
+      }
+    };
+    
+    // Process normal characters
+    const processNormalCharacter = (char, next, patterns) => {
+      const isStringDelimiter = patterns.stringDelimiters.includes(char);
+      
+      // String handling using ternary operators
+      const handleStringStart = () => {
+        const shouldStartString = !state.inString && isStringDelimiter;
+        state = shouldStartString ? 
+          createState({ ...state, inString: true, stringChar: char }) : 
+          state;
+        result += shouldStartString ? char : '';
+        return shouldStartString;
+      };
+      
+      const handleStringContent = () => {
+        const isInString = state.inString;
+        result += isInString ? char : '';
+        
+        // Check for string end using ternary
+        const isStringEnd = isInString && char === state.stringChar && !state.escapeNext;
+        state = isStringEnd ? 
+          createState({ ...state, inString: false, stringChar: '' }) : 
+          state;
+        
+        return isInString;
+      };
+      
+      // Comment detection using object lookup
+      const commentHandlers = {
+        [patterns.multiStart]: () => {
+          state = createState({ ...state, inMultiComment: true });
+          return true; // Skip this and next character
+        },
+        [patterns.singleStart]: () => {
+          // Skip to end of line using while alternative
+          const remainingContent = content.slice(index);
+          const newlineIndex = remainingContent.indexOf('\n');
+          const charsToSkip = newlineIndex === -1 ? remainingContent.length : newlineIndex;
+          
+          // Mark characters for skipping
+          Array.from({ length: charsToSkip }, (_, i) => {
+            const skipIndex = index + i;
+            contentArray[skipIndex] && (contentArray[skipIndex] = null);
+          });
+          
+          // Include newline character
+          const hasNewline = newlineIndex !== -1;
+          result += hasNewline ? '\n' : '';
+          
+          return true;
+        }
+      };
+      
+      const twoCharSequence = char + next;
+      
+      // Process using switch and object lookup
+      switch (true) {
+        case handleStringStart():
+          return;
+          
+        case handleStringContent():
+          return;
+          
+        case commentHandlers[twoCharSequence]?.():
+          return;
+          
+        default:
+          // Regular character
+          result += char;
+      }
+    };
+    
+    processCharacter();
+  });
+
+  // Post-processing using method chaining and regex
+  return result
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim(); // Remove leading/trailing whitespace
 };
 
 /**
