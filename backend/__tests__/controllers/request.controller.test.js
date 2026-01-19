@@ -613,4 +613,142 @@ describe('Request Controller - Body Parsing', () => {
     expect(response.status).toBe(200);
     expect(response.body.requests).toHaveLength(1);
   });
+
+  it('should handle Slack notification failure gracefully', async () => {
+    const mockQuery = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'PENDING' }] }) // createRequest
+      .mockResolvedValueOnce({ // getRequestForNotification
+        rows: [{
+          database_type: 'POSTGRES',
+          instance_name: 'test-instance'
+        }]
+      });
+
+    jest.doMock('../../src/config/db', () => ({
+      query: mockQuery
+    }));
+
+    // Mock Slack service to throw error
+    jest.doMock('../../src/services/slack.service', () => ({
+      isEnabled: () => true,
+      notifyNewSubmission: jest.fn().mockRejectedValue(new Error('Slack API error'))
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 1
+      });
+
+    expect(response.status).toBe(201); // Should still succeed despite Slack failure
+    expect(response.body.success).toBe(true);
+  });
+
+  it('should handle missing request for notification', async () => {
+    const mockQuery = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'PENDING' }] }) // createRequest
+      .mockResolvedValueOnce({ rows: [] }); // getRequestForNotification returns empty
+
+    jest.doMock('../../src/config/db', () => ({
+      query: mockQuery
+    }));
+
+    jest.doMock('../../src/services/slack.service', () => ({
+      isEnabled: () => true,
+      notifyNewSubmission: jest.fn()
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 1
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+  });
+
+  it('should handle different pod_id values', async () => {
+    const mockQuery = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'PENDING' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          database_type: 'POSTGRES',
+          instance_name: 'test-instance'
+        }]
+      });
+
+    jest.doMock('../../src/config/db', () => ({
+      query: mockQuery
+    }));
+
+    jest.doMock('../../src/services/slack.service', () => ({
+      isEnabled: () => true,
+      notifyNewSubmission: jest.fn()
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    // Test with 'de' pod_id
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 'de'
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+  });
+
+  it('should handle unknown pod_id', async () => {
+    const mockQuery = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'PENDING' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          database_type: 'POSTGRES',
+          instance_name: 'test-instance'
+        }]
+      });
+
+    jest.doMock('../../src/config/db', () => ({
+      query: mockQuery
+    }));
+
+    jest.doMock('../../src/services/slack.service', () => ({
+      isEnabled: () => true,
+      notifyNewSubmission: jest.fn()
+    }));
+
+    const appWithUser = require('../../src/app');
+    
+    // Test with unknown pod_id
+    const response = await request(appWithUser)
+      .post('/api/v1/request')
+      .send({
+        instance_id: 1,
+        db_name: 'test_db',
+        query: 'SELECT 1',
+        comments: 'Test',
+        pod_id: 'unknown-pod'
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+  });
 });

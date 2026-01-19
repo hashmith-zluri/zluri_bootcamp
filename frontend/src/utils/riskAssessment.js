@@ -46,15 +46,14 @@ const removeComments = (content, type = 'sql') => {
   
   while (i < content.length) {
     const char = content[i];
-    const remaining = content.slice(i);
     
     // Handle string literals
     const isStringChar = rules.stringChars.includes(char);
     const isEscaped = i > 0 && content[i - 1] === '\\';
     
     if (inBlockComment) {
-      // Look for block comment end
-      if (remaining.startsWith(rules.blockEnd)) {
+      // Look for block comment end - optimized substring check
+      if (content.substr(i, rules.blockEnd.length) === rules.blockEnd) {
         inBlockComment = false;
         i += rules.blockEnd.length;
         continue;
@@ -82,13 +81,13 @@ const removeComments = (content, type = 'sql') => {
       continue;
     }
     
-    if (remaining.startsWith(rules.blockStart)) {
+    if (content.substr(i, rules.blockStart.length) === rules.blockStart) {
       inBlockComment = true;
       i += rules.blockStart.length;
       continue;
     }
     
-    if (remaining.startsWith(rules.lineComment)) {
+    if (content.substr(i, rules.lineComment.length) === rules.lineComment) {
       // Skip to end of line
       const nextNewline = content.indexOf('\n', i);
       if (nextNewline === -1) {
@@ -106,6 +105,169 @@ const removeComments = (content, type = 'sql') => {
 };
 
 /**
+ * SQL Injection detection patterns
+ * @param {string} content - Content to analyze
+ * @returns {Object} - SQL injection analysis result
+ */
+const detectSqlInjection = (content) => {
+  const risks = [];
+  let riskScore = 0;
+  
+  // Remove comments and normalize content
+  const cleanContent = removeComments(content, 'sql').toUpperCase();
+  
+  // SQL Injection patterns - ordered by severity
+  const sqlInjectionPatterns = [
+    // Critical injection patterns - these are clear attack attempts
+    {
+      pattern: /(?:UNION\s+(?:ALL\s+)?SELECT.*FROM.*INFORMATION_SCHEMA|UNION\s+(?:ALL\s+)?SELECT.*FROM.*SYS\.|UNION\s+(?:ALL\s+)?SELECT.*FROM.*PG_)/gi,
+      reason: 'UNION-based SQL injection attempt detected',
+      points: 8,
+      type: 'critical'
+    },
+    {
+      pattern: /(?:DROP\s+(?:TABLE|DATABASE|SCHEMA)|TRUNCATE\s+TABLE).*(?:;|\s*--|\s*\/\*).*(?:DROP|DELETE|INSERT|UPDATE)/gi,
+      reason: 'Chained destructive SQL injection attempt',
+      points: 8,
+      type: 'critical'
+    },
+    {
+      pattern: /(?:EXEC\s*\(|EXECUTE\s*\(|SP_EXECUTESQL).*(?:CHAR|NCHAR|VARCHAR|NVARCHAR)\s*\(.*\+/gi,
+      reason: 'Dynamic SQL execution with string concatenation - injection risk',
+      points: 7,
+      type: 'critical'
+    },
+    
+    // High-risk injection patterns - classic attack signatures
+    {
+      pattern: /(?:'\s*OR\s+1\s*=\s*1\s*--|"\s*OR\s+1\s*=\s*1\s*--|'\s*OR\s+TRUE\s*--|"\s*OR\s+TRUE\s*--)/gi,
+      reason: 'Classic SQL injection pattern (OR 1=1 with comment)',
+      points: 7,
+      type: 'critical'
+    },
+    {
+      pattern: /(?:'\s*;\s*DROP|"\s*;\s*DROP|'\s*;\s*DELETE|"\s*;\s*DELETE)/gi,
+      reason: 'Statement termination with destructive command - injection attempt',
+      points: 7,
+      type: 'critical'
+    },
+    {
+      pattern: /(?:OR\s+1\s*=\s*1\s+AND|OR\s+TRUE\s+AND).*(?:SLEEP|WAITFOR|BENCHMARK)/gi,
+      reason: 'Boolean-based blind SQL injection with time delay',
+      points: 6,
+      type: 'high'
+    },
+    {
+      pattern: /(?:WAITFOR\s+DELAY|BENCHMARK\s*\(|SLEEP\s*\(|PG_SLEEP\s*\().*['"].*['"]/gi,
+      reason: 'Time-based SQL injection attempt detected',
+      points: 6,
+      type: 'high'
+    },
+    {
+      pattern: /(?:LOAD_FILE\s*\(|INTO\s+OUTFILE|INTO\s+DUMPFILE).*['"].*['"]/gi,
+      reason: 'File system access attempt - potential injection',
+      points: 6,
+      type: 'high'
+    },
+    
+    // Medium-risk patterns - suspicious but could be legitimate
+    {
+      pattern: /(?:--|\#|\/\*.*\*\/).*(?:DROP|DELETE.*FROM.*WHERE\s+1\s*=\s*1|UPDATE.*SET.*WHERE\s+1\s*=\s*1)/gi,
+      reason: 'Suspicious SQL commands in comments',
+      points: 4,
+      type: 'medium'
+    },
+    {
+      pattern: /(?:CONCAT\s*\(|CHAR\s*\(|ASCII\s*\(|ORD\s*\().*(?:UNION\s+SELECT|INSERT.*VALUES)/gi,
+      reason: 'String manipulation with injection patterns',
+      points: 4,
+      type: 'medium'
+    },
+    {
+      pattern: /(?:HAVING\s+1\s*=\s*1.*--|GROUP\s+BY.*HAVING.*1\s*=\s*1)/gi,
+      reason: 'HAVING clause manipulation with comment - potential injection',
+      points: 3,
+      type: 'medium'
+    },
+    
+    // Obfuscation patterns
+    {
+      pattern: /(?:0x[0-9A-F]{4,}|CHAR\s*\(\s*\d+(?:\s*,\s*\d+){3,}\s*\)).*(?:UNION|SELECT|INSERT|UPDATE|DELETE)/gi,
+      reason: 'Hexadecimal or CHAR encoding with SQL keywords - obfuscation attempt',
+      points: 4,
+      type: 'medium'
+    },
+    {
+      pattern: /(?:'\s*\+\s*'|"\s*\+\s*"|'\s*\|\|\s*'|"\s*\|\|\s*").*(?:UNION|SELECT|DROP|DELETE)/gi,
+      reason: 'String concatenation with SQL keywords - potential injection',
+      points: 3,
+      type: 'medium'
+    },
+    
+    // NoSQL injection patterns
+    {
+      pattern: /(?:\$WHERE|\$REGEX|\$NE|\$GT|\$LT|\$IN|\$NIN).*(?:FUNCTION\s*\(|EVAL\s*\(|THIS\.).*(?:DROP|DELETE|UPDATE)/gi,
+      reason: 'NoSQL injection attempt with destructive operations detected',
+      points: 5,
+      type: 'high'
+    },
+    {
+      pattern: /(?:JAVASCRIPT:|EVAL\s*\(|FUNCTION\s*\().*(?:\$|DB\.).*(?:DROP|DELETE|UPDATE)/gi,
+      reason: 'JavaScript injection in NoSQL context with destructive operations',
+      points: 5,
+      type: 'high'
+    }
+  ];
+  
+  // Check for multiple suspicious patterns
+  let patternMatches = 0;
+  
+  sqlInjectionPatterns.forEach(({ pattern, reason, points, type }) => {
+    const matches = content.match(pattern);
+    if (matches) {
+      patternMatches++;
+      riskScore += points;
+      risks.push({ 
+        type, 
+        reason: `${reason} (${matches.length} occurrence${matches.length > 1 ? 's' : ''})`,
+        location: 'content',
+        matches: matches.length
+      });
+    }
+  });
+  
+  // Additional risk for multiple injection patterns
+  if (patternMatches >= 3) {
+    riskScore += 3;
+    risks.push({
+      type: 'high',
+      reason: `Multiple SQL injection patterns detected (${patternMatches} different types)`,
+      location: 'content'
+    });
+  }
+  
+  // Check for suspicious character sequences (only if they appear to be malicious)
+  const suspiciousSequences = [
+    { pattern: /['"]\s*;\s*(?:DROP|DELETE|UPDATE|INSERT)['"]/g, reason: 'Statement termination with SQL commands in strings', points: 4 },
+    { pattern: /['"]\s*--.*(?:DROP|DELETE|UPDATE|INSERT)/g, reason: 'Comment injection with SQL commands', points: 3 },
+    { pattern: /\\\x00|\\\x1a/g, reason: 'Null byte injection attempt', points: 4 },
+    { pattern: /%27.*(?:UNION|DROP|DELETE).*%27|%22.*(?:UNION|DROP|DELETE).*%22/gi, reason: 'URL-encoded SQL injection attempt', points: 4 }
+  ];
+  
+  suspiciousSequences.forEach(({ pattern, reason, points }) => {
+    if (pattern.test(content)) {
+      riskScore += points;
+      risks.push({
+        type: 'medium',
+        reason,
+        location: 'content'
+      });
+    }
+  });
+  
+  return { risks, riskScore, injectionAnalysis: true };
+};
+/**
  * AST-based SQL risk analysis
  * @param {string} sql - SQL query to analyze
  * @param {string} dbType - Database type
@@ -118,6 +280,11 @@ const analyzeSqlAst = (sql, dbType) => {
     
     const risks = [];
     let riskScore = 0;
+    
+    // First, check for SQL injection patterns
+    const injectionResult = detectSqlInjection(sql);
+    risks.push(...injectionResult.risks);
+    riskScore += injectionResult.riskScore;
     
     // Analyze AST nodes for security risks
     const analyzeNode = (node, path = []) => {
@@ -268,12 +435,18 @@ const analyzeSqlAst = (sql, dbType) => {
       analyzeNode(ast, ['root']);
     }
     
-    return { risks, riskScore, astAnalysis: true };
+    return { risks, riskScore, astAnalysis: true, injectionChecked: true };
     
   } catch (error) {
-    // If AST parsing fails, fall back to pattern-based analysis
-    console.warn('AST parsing failed, falling back to pattern analysis:', error.message);
-    return { risks: [], riskScore: 0, astAnalysis: false, parseError: error.message };
+    // If AST parsing fails, still check for SQL injection
+    const injectionResult = detectSqlInjection(sql);
+    return { 
+      risks: injectionResult.risks, 
+      riskScore: injectionResult.riskScore, 
+      astAnalysis: false, 
+      injectionChecked: true,
+      parseError: error.message 
+    };
   }
 };
 
@@ -288,6 +461,11 @@ const analyzeMongoScript = (script) => {
   
   // Remove comments first
   const cleanScript = removeComments(script, 'js').toUpperCase();
+  
+  // Check for SQL injection patterns first (in case of query() calls)
+  const injectionResult = detectSqlInjection(script);
+  risks.push(...injectionResult.risks);
+  riskScore += injectionResult.riskScore;
   
   // MongoDB-specific dangerous patterns
   const mongoPatterns = [
@@ -483,7 +661,7 @@ const analyzeMongoScript = (script) => {
     });
   }
   
-  return { risks, riskScore, astAnalysis: false };
+  return { risks, riskScore, astAnalysis: false, injectionChecked: true };
 };
 
 /**
@@ -664,6 +842,19 @@ export const getComprehensiveRiskAnalysis = (query, script, dbType) => {
   // Generate recommendations based on risk level
   const recommendations = [];
   
+  // Check if SQL injection was detected
+  const hasInjectionRisks = riskResult.analysis?.detailedRisks?.some(risk => 
+    risk.reason.toLowerCase().includes('injection') || 
+    risk.reason.toLowerCase().includes('union') ||
+    risk.reason.toLowerCase().includes('or 1=1')
+  );
+  
+  if (hasInjectionRisks) {
+    recommendations.push('🚨 SECURITY ALERT: Potential SQL injection detected - DO NOT EXECUTE');
+    recommendations.push('🔒 Review the query for malicious patterns');
+    recommendations.push('📋 Contact security team if this was not intentional');
+  }
+  
   switch (riskResult.level) {
     case 'critical':
       recommendations.push('🚨 CRITICAL: This operation should be reviewed by a senior developer');
@@ -701,6 +892,11 @@ export const getComprehensiveRiskAnalysis = (query, script, dbType) => {
     ...riskResult,
     recommendations,
     syntaxValidation,
+    securityChecks: {
+      sqlInjectionChecked: riskResult.analysis?.injectionChecked || false,
+      hasInjectionRisks,
+      astAnalysisUsed: riskResult.analysis?.astUsed || false
+    },
     timestamp: new Date().toISOString()
   };
 };

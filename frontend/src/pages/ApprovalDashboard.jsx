@@ -57,13 +57,15 @@ export default function ApprovalDashboard() {
     try {
       const data = await approvalAPI.getPendingRequests({});
       const allRequests = data.requests || [];
-      setStats({
-        all: allRequests.length,
-        PENDING: allRequests.filter(r => r.status === 'PENDING').length,
-        EXECUTED: allRequests.filter(r => r.status === 'EXECUTED').length,
-        FAILED: allRequests.filter(r => r.status === 'FAILED').length,
-        REJECTED: allRequests.filter(r => r.status === 'REJECTED').length,
-      });
+      
+      // Single loop optimization: calculate all stats in one pass
+      const stats = allRequests.reduce((acc, request) => {
+        acc.all++;
+        acc[request.status] = (acc[request.status] || 0) + 1;
+        return acc;
+      }, { all: 0, PENDING: 0, EXECUTED: 0, FAILED: 0, REJECTED: 0 });
+      
+      setStats(stats);
     } catch (err) {
       // Silently fail for stats
       console.error('Failed to fetch stats:', err);

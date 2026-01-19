@@ -11,21 +11,19 @@ class MongoScriptExecutionService {
     try {
       const request = await QueryRequestRepository.findWithInstance(requestId);
 
-      if (!request) {
-        throw new Error(`Request ${requestId} not found`);
-      }
+      // Functional validation chain - throws on first failure
+      const validateMongoScript = (req, id) => {
+        const validationError = [
+          () => req ? null : `Request ${id} not found`,
+          () => (req?.status === 'APPROVED') ? null : `Request ${id} is not approved. Current status: ${req?.status}`,
+          () => (req?.engine === 'MONGO') ? null : `Expected MongoDB instance, got: ${req?.engine}`,
+          () => req?.script_path ? null : 'No script content found in request'
+        ].map(validator => validator()).find(error => error !== null);
+        
+        return validationError ? (() => { throw new Error(validationError); })() : req;
+      };
 
-      if (request.status !== 'APPROVED') {
-        throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
-      }
-
-      if (request.engine !== 'MONGO') {
-        throw new Error(`Expected MongoDB instance, got: ${request.engine}`);
-      }
-
-      if (!request.script_path) {
-        throw new Error('No script content found in request');
-      }
+      validateMongoScript(request, requestId);
 
       console.log(`Executing MongoDB script for request ${requestId}:`);
       console.log(`Instance: ${request.instance_name}`);
@@ -114,17 +112,16 @@ class MongoScriptExecutionService {
   }
 
   validateScriptContent(scriptContent) {
-    const content = scriptContent.trim();
+    // Functional validation with early returns
+    const validations = [
+      (content) => content.trim() ? null : 'Script content is empty',
+      (content) => content.includes('console.log(') ? null : 'Script must include "console.log()" to capture execution results'
+    ];
     
-    if (!content) {
-      throw new Error('Script content is empty');
-    }
-
-    if (!content.includes('console.log(')) {
-      throw new Error('Script must include "console.log()" to capture execution results');
-    }
-
-    return true;
+    const content = scriptContent.trim();
+    const error = validations.map(validator => validator(content)).find(result => result !== null);
+    
+    return error ? (() => { throw new Error(error); })() : true;
   }
 
   async executeScript(instance, databaseName, scriptContent) {
@@ -165,268 +162,184 @@ class MongoScriptExecutionService {
         const { parentPort, workerData } = require('worker_threads');
         const { MongoClient, ObjectId } = require('mongodb');
         
+        // Utility functions for cleaner code
+        const createLogger = () => {
+          let userOutput = '';
+          const logFormatter = (args) => args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          
+          return {
+            log: (...args) => { userOutput += logFormatter(args) + '\\n'; },
+            error: (...args) => { userOutput += '[ERROR] ' + logFormatter(args) + '\\n'; },
+            getOutput: () => userOutput.trim()
+          };
+        };
+        
+        const createClientOptions = (connectionString) => ({
+          maxPoolSize: 5,
+          serverSelectionTimeoutMS: 10000,
+          socketTimeoutMS: 30000,
+          ...(connectionString.includes('mongodb+srv://') && {
+            tls: true,
+            tlsAllowInvalidCertificates: true,
+            tlsAllowInvalidHostnames: true
+          })
+        });
+        
+        const createErrorHandler = () => ({
+          setError: (message) => {
+            global.__hasDbError = true;
+            global.__dbErrorMessage = message;
+          },
+          hasError: () => global.__hasDbError,
+          getMessage: () => global.__dbErrorMessage
+        });
+        
+        const wrapAsyncMethod = (method, errorHandler) => async (...args) => {
+          try {
+            return await method(...args);
+          } catch (error) {
+            errorHandler.setError(error.message);
+            throw error;
+          }
+        };
+        
+        const wrapCursorMethods = (cursor, errorHandler) => {
+          if (!cursor || typeof cursor.toArray !== 'function') return cursor;
+          
+          const methodsToWrap = ['toArray', 'forEach'];
+          methodsToWrap.forEach(methodName => {
+            if (cursor[methodName]) {
+              const original = cursor[methodName].bind(cursor);
+              cursor[methodName] = wrapAsyncMethod(original, errorHandler);
+            }
+          });
+          
+          // Handle chaining methods
+          const chainingMethods = ['limit', 'skip', 'sort'];
+          chainingMethods.forEach(methodName => {
+            if (cursor[methodName]) {
+              const original = cursor[methodName].bind(cursor);
+              cursor[methodName] = (...args) => wrapCursorMethods(original(...args), errorHandler);
+            }
+          });
+          
+          return cursor;
+        };
+        
+        const wrapCollectionMethods = (collection, errorHandler) => {
+          const methodsToWrap = [
+            'find', 'findOne', 'insertOne', 'insertMany', 'updateOne', 'updateMany',
+            'deleteOne', 'deleteMany', 'aggregate', 'countDocuments', 'distinct'
+          ];
+          
+          methodsToWrap.forEach(methodName => {
+            if (typeof collection[methodName] === 'function') {
+              const originalMethod = collection[methodName].bind(collection);
+              collection[methodName] = (...args) => {
+                try {
+                  const result = originalMethod(...args);
+                  return methodName === 'find' && result?.toArray 
+                    ? wrapCursorMethods(result, errorHandler) 
+                    : result;
+                } catch (error) {
+                  errorHandler.setError(error.message);
+                  throw error;
+                }
+              };
+            }
+          });
+          
+          return collection;
+        };
+        
+        const setupGlobals = (db, client) => {
+          const globals = {
+            db, client, ObjectId, JSON, Date, Math, parseInt, parseFloat,
+            isNaN, isFinite, Promise, setTimeout, clearTimeout,
+            collection: (name) => db.collection(name)
+          };
+          
+          Object.assign(global, globals);
+        };
+        
+        const createResultMessage = (success, output, error = null) => ({
+          success,
+          ...(error && { error }),
+          output,
+          metadata: {
+            database: workerData.databaseName,
+            host: workerData.host,
+            port: workerData.port,
+            executed_at: new Date().toISOString()
+          }
+        });
+        
+        const detectOutputErrors = (output) => {
+          const errorPatterns = [
+            'failed to', 'error:', 'is not defined', 'cannot read', 'undefined', 'query is not defined'
+          ];
+          
+          const outputLower = output.toLowerCase();
+          const hasError = errorPatterns.some(pattern => outputLower.includes(pattern));
+          
+          if (hasError) {
+            const lines = output.split('\\n');
+            const errorLine = lines.find(line => 
+              errorPatterns.some(pattern => line.toLowerCase().includes(pattern))
+            );
+            return errorLine || 'Script execution failed';
+          }
+          
+          return null;
+        };
+        
         async function executeScript() {
           let client = null;
-          let userOutput = '';
+          const logger = createLogger();
+          const errorHandler = createErrorHandler();
+          
+          // Override console methods
+          console.log = logger.log;
+          console.error = logger.error;
           
           try {
-            console.log = (...args) => {
-              const logMessage = args.map(arg => 
-                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-              ).join(' ');
-              userOutput += logMessage + '\\n';
-            };
-            
-            console.error = (...args) => {
-              const logMessage = args.map(arg => 
-                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-              ).join(' ');
-              userOutput += '[ERROR] ' + logMessage + '\\n';
-            };
-            
-            // Create MongoDB client with appropriate options for Atlas or local
-            const clientOptions = {
-              maxPoolSize: 5,
-              serverSelectionTimeoutMS: 10000,
-              socketTimeoutMS: 30000
-            };
-            
-            // TLS options for Atlas connections (only supported options)
-            if (workerData.connectionString.includes('mongodb+srv://')) {
-              clientOptions.tls = true;
-              clientOptions.tlsAllowInvalidCertificates = true;
-              clientOptions.tlsAllowInvalidHostnames = true;
-            }
-            
+            const clientOptions = createClientOptions(workerData.connectionString);
             client = new MongoClient(workerData.connectionString, clientOptions);
             
             await client.connect();
-            
             const db = client.db(workerData.databaseName);
             
-            // Wrap database operations to detect errors
+            // Wrap database operations
             const originalCollection = db.collection.bind(db);
-            db.collection = (name) => {
-              const collection = originalCollection(name);
-              
-              // Wrap collection methods to detect errors
-              const wrapMethod = (methodName) => {
-                const originalMethod = collection[methodName].bind(collection);
-                return (...args) => {
-                  try {
-                    const result = originalMethod(...args);
-                    
-                    // If this is a find operation, wrap the cursor methods too
-                    if (methodName === 'find' && result && typeof result.toArray === 'function') {
-                      const originalToArray = result.toArray.bind(result);
-                      const originalForEach = result.forEach ? result.forEach.bind(result) : null;
-                      const originalMap = result.map ? result.map.bind(result) : null;
-                      const originalLimit = result.limit ? result.limit.bind(result) : null;
-                      const originalSkip = result.skip ? result.skip.bind(result) : null;
-                      const originalSort = result.sort ? result.sort.bind(result) : null;
-                      
-                      result.toArray = async () => {
-                        try {
-                          return await originalToArray();
-                        } catch (error) {
-                          global.__hasDbError = true;
-                          global.__dbErrorMessage = error.message;
-                          throw error;
-                        }
-                      };
-                      
-                      if (originalForEach) {
-                        result.forEach = async (callback) => {
-                          try {
-                            return await originalForEach(callback);
-                          } catch (error) {
-                            global.__hasDbError = true;
-                            global.__dbErrorMessage = error.message;
-                            throw error;
-                          }
-                        };
-                      }
-                      
-                      if (originalMap) {
-                        result.map = (callback) => {
-                          try {
-                            const mappedCursor = originalMap(callback);
-                            // Recursively wrap the mapped cursor
-                            if (mappedCursor && typeof mappedCursor.toArray === 'function') {
-                              const origToArray = mappedCursor.toArray.bind(mappedCursor);
-                              mappedCursor.toArray = async () => {
-                                try {
-                                  return await origToArray();
-                                } catch (error) {
-                                  global.__hasDbError = true;
-                                  global.__dbErrorMessage = error.message;
-                                  throw error;
-                                }
-                              };
-                            }
-                            return mappedCursor;
-                          } catch (error) {
-                            global.__hasDbError = true;
-                            global.__dbErrorMessage = error.message;
-                            throw error;
-                          }
-                        };
-                      }
-                      
-                      // Wrap chaining methods that return cursors
-                      if (originalLimit) {
-                        result.limit = (num) => {
-                          const limitedCursor = originalLimit(num);
-                          return wrapCursor(limitedCursor);
-                        };
-                      }
-                      
-                      if (originalSkip) {
-                        result.skip = (num) => {
-                          const skippedCursor = originalSkip(num);
-                          return wrapCursor(skippedCursor);
-                        };
-                      }
-                      
-                      if (originalSort) {
-                        result.sort = (sortSpec) => {
-                          const sortedCursor = originalSort(sortSpec);
-                          return wrapCursor(sortedCursor);
-                        };
-                      }
-                    }
-                    
-                    return result;
-                  } catch (error) {
-                    global.__hasDbError = true;
-                    global.__dbErrorMessage = error.message;
-                    throw error;
-                  }
-                };
-              };
-              
-              // Helper function to wrap cursor methods
-              const wrapCursor = (cursor) => {
-                if (!cursor || typeof cursor.toArray !== 'function') return cursor;
-                
-                const originalToArray = cursor.toArray.bind(cursor);
-                cursor.toArray = async () => {
-                  try {
-                    return await originalToArray();
-                  } catch (error) {
-                    global.__hasDbError = true;
-                    global.__dbErrorMessage = error.message;
-                    throw error;
-                  }
-                };
-                
-                return cursor;
-              };
-              
-              // Wrap common MongoDB operations
-              ['find', 'findOne', 'insertOne', 'insertMany', 'updateOne', 'updateMany', 
-               'deleteOne', 'deleteMany', 'aggregate', 'countDocuments', 'distinct'].forEach(method => {
-                if (typeof collection[method] === 'function') {
-                  collection[method] = wrapMethod(method);
-                }
-              });
-              
-              return collection;
-            };
+            db.collection = (name) => wrapCollectionMethods(originalCollection(name), errorHandler);
             
-            global.db = db;
-            global.client = client;
-            global.collection = (name) => db.collection(name);
+            setupGlobals(db, client);
             
-            global.JSON = JSON;
-            global.Date = Date;
-            global.Math = Math;
-            global.parseInt = parseInt;
-            global.parseFloat = parseFloat;
-            global.isNaN = isNaN;
-            global.isFinite = isFinite;
-            global.Promise = Promise;
-            global.setTimeout = setTimeout;
-            global.clearTimeout = clearTimeout;
-            global.ObjectId = ObjectId;
-            
+            // Execute user script
             const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
             const userFunction = new AsyncFunction(workerData.scriptContent);
             await userFunction();
             
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Check if any database errors occurred during execution
-            if (global.__hasDbError) {
-              parentPort.postMessage({
-                success: false,
-                error: global.__dbErrorMessage,
-                output: userOutput.trim(),
-                metadata: {
-                  database: workerData.databaseName,
-                  host: workerData.host,
-                  port: workerData.port,
-                  executed_at: new Date().toISOString()
-                }
-              });
+            const output = logger.getOutput();
+            
+            // Check for errors
+            if (errorHandler.hasError()) {
+              parentPort.postMessage(createResultMessage(false, output, errorHandler.getMessage()));
             } else {
-              // Check if the output contains error messages indicating failure
-              const outputLower = userOutput.toLowerCase();
-              const hasErrorInOutput = outputLower.includes('failed to') || 
-                                     outputLower.includes('error:') || 
-                                     outputLower.includes('is not defined') ||
-                                     outputLower.includes('cannot read') ||
-                                     outputLower.includes('undefined') ||
-                                     outputLower.includes('query is not defined');
-              
-              if (hasErrorInOutput) {
-                // Extract error message from output
-                const lines = userOutput.split('\\n');
-                const errorLine = lines.find(line => 
-                  line.toLowerCase().includes('failed to') || 
-                  line.toLowerCase().includes('is not defined') ||
-                  line.toLowerCase().includes('cannot read') ||
-                  line.toLowerCase().includes('undefined') ||
-                  line.toLowerCase().includes('query is not defined')
-                );
-                
-                parentPort.postMessage({
-                  success: false,
-                  error: errorLine || 'Script execution failed',
-                  output: userOutput.trim(),
-                  metadata: {
-                    database: workerData.databaseName,
-                    host: workerData.host,
-                    port: workerData.port,
-                    executed_at: new Date().toISOString()
-                  }
-                });
+              const outputError = detectOutputErrors(output);
+              if (outputError) {
+                parentPort.postMessage(createResultMessage(false, output, outputError));
               } else {
-                parentPort.postMessage({
-                  success: true,
-                  output: userOutput.trim(),
-                  metadata: {
-                    database: workerData.databaseName,
-                    host: workerData.host,
-                    port: workerData.port,
-                    executed_at: new Date().toISOString()
-                  }
-                });
+                parentPort.postMessage(createResultMessage(true, output));
               }
             }
             
           } catch (error) {
-            parentPort.postMessage({
-              success: false,
-              error: error.message,
-              output: userOutput.trim(),
-              metadata: {
-                database: workerData.databaseName,
-                host: workerData.host,
-                port: workerData.port,
-                executed_at: new Date().toISOString()
-              }
-            });
+            parentPort.postMessage(createResultMessage(false, logger.getOutput(), error.message));
           } finally {
             if (client) {
               try { await client.close(); } catch (e) {}
@@ -434,29 +347,19 @@ class MongoScriptExecutionService {
           }
         }
         
-        process.on('uncaughtException', (error) => {
+        // Error handlers
+        const handleError = (type, error) => {
           parentPort.postMessage({
             success: false,
-            error: 'Uncaught exception: ' + error.message,
+            error: \`\${type}: \${error?.message || error}\`,
             output: ''
           });
-        });
+        };
         
-        process.on('unhandledRejection', (reason) => {
-          parentPort.postMessage({
-            success: false,
-            error: 'Unhandled rejection: ' + (reason?.message || reason),
-            output: ''
-          });
-        });
+        process.on('uncaughtException', (error) => handleError('Uncaught exception', error));
+        process.on('unhandledRejection', (reason) => handleError('Unhandled rejection', reason));
         
-        executeScript().catch(error => {
-          parentPort.postMessage({
-            success: false,
-            error: 'Script execution failed: ' + error.message,
-            output: ''
-          });
-        });
+        executeScript().catch(error => handleError('Script execution failed', error));
       `;
       
       const tempWorkerFile = path.join(__dirname, '..', '..', 'temp', `mongo_worker_${Date.now()}.js`);
@@ -566,21 +469,21 @@ class MongoScriptExecutionService {
     try {
       const log = await ExecutionLogRepository.findLatestScriptExecution(requestId);
 
-      if (!log) {
-        return {
-          status: 'pending',
-          message: 'Script not yet executed'
-        };
-      }
+      // Functional result mapping with default fallback
+      const resultMapper = (logData) => logData 
+        ? {
+            status: logData.success ? 'success' : 'failure',
+            output: logData.output,
+            error: logData.error,
+            executionTime: logData.execution_time_ms,
+            executedAt: logData.executed_at
+          }
+        : {
+            status: 'pending',
+            message: 'Script not yet executed'
+          };
 
-      return {
-        status: log.success ? 'success' : 'failure',
-        output: log.output,
-        error: log.error,
-        executionTime: log.execution_time_ms,
-        executedAt: log.executed_at,
-        scriptPath: log.script_path
-      };
+      return resultMapper(log);
     } catch (error) {
       console.error(`Failed to get script execution result for request ${requestId}:`, error.message);
       throw error;

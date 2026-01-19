@@ -77,6 +77,59 @@ describe('Slack Service', () => {
       slackService = createService(false);
       expect(slackService.isEnabled()).toBe(false);
     });
+
+    it('should be disabled when SLACK_ENABLED is undefined', () => {
+      process.env.SLACK_ENABLED = undefined;
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.isEnabled()).toBe(false);
+    });
+
+    it('should be disabled when SLACK_ENABLED is empty string', () => {
+      process.env.SLACK_ENABLED = '';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.isEnabled()).toBe(false);
+    });
+
+    it('should be disabled when SLACK_ENABLED is false string', () => {
+      process.env.SLACK_ENABLED = 'false';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.isEnabled()).toBe(false);
+    });
+
+    it('should use default admin email when not provided', () => {
+      delete process.env.SLACK_ADMIN_EMAIL;
+      process.env.SLACK_ENABLED = 'true';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.adminEmail).toBe('hashmith.b@zluri.com');
+    });
+
+    it('should use custom admin email when provided', () => {
+      process.env.SLACK_ADMIN_EMAIL = 'custom@example.com';
+      process.env.SLACK_ENABLED = 'true';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.adminEmail).toBe('custom@example.com');
+    });
+
+    it('should use default frontend URL when not provided', () => {
+      delete process.env.FRONTEND_URL;
+      process.env.SLACK_ENABLED = 'true';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.frontendUrl).toBe('https://zluri-bootcamp.vercel.app');
+    });
+
+    it('should use custom frontend URL when provided', () => {
+      process.env.FRONTEND_URL = 'https://custom.example.com';
+      process.env.SLACK_ENABLED = 'true';
+      jest.resetModules();
+      const SlackServiceNew = require('../../src/services/slack.service');
+      expect(SlackServiceNew.frontendUrl).toBe('https://custom.example.com');
+    });
   });
 
   describe('truncateText', () => {
@@ -94,6 +147,14 @@ describe('Slack Service', () => {
 
     it('should return empty string for empty string', () => {
       expect(slackService.truncateText('')).toBe('');
+    });
+
+    it('should return empty string for false', () => {
+      expect(slackService.truncateText(false)).toBe('');
+    });
+
+    it('should return empty string for 0', () => {
+      expect(slackService.truncateText(0)).toBe('');
     });
 
     it('should not truncate text shorter than max length', () => {
@@ -117,6 +178,26 @@ describe('Slack Service', () => {
       const exactText = 'a'.repeat(500);
       expect(slackService.truncateText(exactText, 500)).toBe(exactText);
     });
+
+    it('should handle custom max length', () => {
+      const text = 'Hello World';
+      expect(slackService.truncateText(text, 5)).toBe('Hello...');
+    });
+
+    it('should handle max length of 0', () => {
+      expect(slackService.truncateText('test', 0)).toBe('...');
+    });
+
+    it('should handle negative max length', () => {
+      expect(slackService.truncateText('test', -5)).toBe('...');
+    });
+
+    it('should handle very long text with small max length', () => {
+      const longText = 'a'.repeat(1000);
+      const result = slackService.truncateText(longText, 10);
+      expect(result).toBe('a'.repeat(10) + '...');
+      expect(result.length).toBe(13);
+    });
   });
 
   describe('formatQueryPreview', () => {
@@ -132,6 +213,18 @@ describe('Slack Service', () => {
       expect(slackService.formatQueryPreview(null, 'script.js')).toBe('script.js');
     });
 
+    it('should return script when query is undefined', () => {
+      expect(slackService.formatQueryPreview(undefined, 'script.js')).toBe('script.js');
+    });
+
+    it('should return script when query is empty string', () => {
+      expect(slackService.formatQueryPreview('', 'script.js')).toBe('script.js');
+    });
+
+    it('should return script when query is false', () => {
+      expect(slackService.formatQueryPreview(false, 'script.js')).toBe('script.js');
+    });
+
     it('should prefer query over script', () => {
       expect(slackService.formatQueryPreview('SELECT 1', 'script.js')).toBe('SELECT 1');
     });
@@ -140,11 +233,40 @@ describe('Slack Service', () => {
       expect(slackService.formatQueryPreview(null, null)).toBe('N/A');
     });
 
+    it('should return N/A when both are undefined', () => {
+      expect(slackService.formatQueryPreview(undefined, undefined)).toBe('N/A');
+    });
+
+    it('should return N/A when both are empty strings', () => {
+      expect(slackService.formatQueryPreview('', '')).toBe('N/A');
+    });
+
+    it('should return N/A when both are falsy', () => {
+      expect(slackService.formatQueryPreview(false, 0)).toBe('N/A');
+    });
+
     it('should truncate long queries to 200 chars', () => {
       const longQuery = 'SELECT ' + 'a'.repeat(300);
       const result = slackService.formatQueryPreview(longQuery, null);
       expect(result.length).toBe(203);
       expect(result.endsWith('...')).toBe(true);
+    });
+
+    it('should truncate long scripts to 200 chars', () => {
+      const longScript = 'console.log(' + 'a'.repeat(300) + ')';
+      const result = slackService.formatQueryPreview(null, longScript);
+      expect(result.length).toBe(203);
+      expect(result.endsWith('...')).toBe(true);
+    });
+
+    it('should handle multiline queries', () => {
+      const multilineQuery = 'SELECT *\nFROM users\nWHERE active = true';
+      expect(slackService.formatQueryPreview(multilineQuery, null)).toBe(multilineQuery);
+    });
+
+    it('should handle special characters', () => {
+      const queryWithSpecialChars = "SELECT * FROM users WHERE name = 'O''Reilly'";
+      expect(slackService.formatQueryPreview(queryWithSpecialChars, null)).toBe(queryWithSpecialChars);
     });
   });
 
@@ -164,6 +286,14 @@ describe('Slack Service', () => {
 
       it('should return "No output" for empty string', () => {
         expect(slackService.formatExecutionOutput('')).toBe('No output');
+      });
+
+      it('should return "No output" for false', () => {
+        expect(slackService.formatExecutionOutput(false)).toBe('No output');
+      });
+
+      it('should return "No output" for 0', () => {
+        expect(slackService.formatExecutionOutput(0)).toBe('No output');
       });
     });
 
@@ -248,6 +378,22 @@ describe('Slack Service', () => {
         expect(result).toContain('2 results');
         expect(result).toContain('"id": 1');
       });
+
+      it('should handle null result_data', () => {
+        const output = JSON.stringify({
+          console_output: 'Query executed.',
+          result_data: null
+        });
+        expect(slackService.formatExecutionOutput(output)).toBe('Query executed.');
+      });
+
+      it('should handle non-array result_data', () => {
+        const output = JSON.stringify({
+          console_output: 'Query executed.',
+          result_data: { count: 5 }
+        });
+        expect(slackService.formatExecutionOutput(output)).toBe('Query executed.');
+      });
     });
 
     describe('script format (console_output only)', () => {
@@ -264,6 +410,46 @@ describe('Slack Service', () => {
         });
         expect(slackService.formatExecutionOutput(output)).toBe('Line 1\nLine 2\nLine 3');
       });
+
+      it('should handle empty console_output', () => {
+        const output = JSON.stringify({
+          console_output: ''
+        });
+        const result = slackService.formatExecutionOutput(output);
+        expect(result).toBe('{\n  "console_output": ""\n}');
+      });
+
+      it('should handle null console_output', () => {
+        const output = JSON.stringify({
+          console_output: null
+        });
+        const result = slackService.formatExecutionOutput(output);
+        expect(result).toBe('{\n  "console_output": null\n}');
+      });
+
+      it('should handle undefined console_output', () => {
+        const output = JSON.stringify({
+          console_output: undefined
+        });
+        const result = slackService.formatExecutionOutput(output);
+        expect(result).toBe('{}');
+      });
+
+      it('should handle false console_output', () => {
+        const output = JSON.stringify({
+          console_output: false
+        });
+        const result = slackService.formatExecutionOutput(output);
+        expect(result).toBe('{\n  "console_output": false\n}');
+      });
+
+      it('should handle 0 console_output', () => {
+        const output = JSON.stringify({
+          console_output: 0
+        });
+        const result = slackService.formatExecutionOutput(output);
+        expect(result).toBe('{\n  "console_output": 0\n}');
+      });
     });
 
     describe('generic JSON', () => {
@@ -274,6 +460,18 @@ describe('Slack Service', () => {
         expect(result).toContain('"status": "success"');
         expect(result).toContain('"count": 5');
       });
+
+      it('should handle complex nested objects', () => {
+        const output = JSON.stringify({ 
+          data: { users: [{ name: 'John' }] },
+          meta: { total: 1 }
+        });
+        const result = slackService.formatExecutionOutput(output);
+        
+        expect(result).toContain('"users"');
+        expect(result).toContain('"John"');
+        expect(result).toContain('"total": 1');
+      });
     });
 
     describe('non-JSON output', () => {
@@ -283,6 +481,19 @@ describe('Slack Service', () => {
 
       it('should handle malformed JSON', () => {
         expect(slackService.formatExecutionOutput('{ invalid }')).toBe('{ invalid }');
+      });
+
+      it('should handle partial JSON', () => {
+        expect(slackService.formatExecutionOutput('{"incomplete":')).toBe('{"incomplete":');
+      });
+
+      it('should handle numbers as strings', () => {
+        expect(slackService.formatExecutionOutput('12345')).toBe('12345');
+      });
+
+      it('should handle boolean strings', () => {
+        expect(slackService.formatExecutionOutput('true')).toBe('true');
+        expect(slackService.formatExecutionOutput('false')).toBe('false');
       });
     });
   });
@@ -389,12 +600,12 @@ describe('Slack Service', () => {
       expect(slackService.isEnabled()).toBe(false);
     });
 
-    it('should handle errors gracefully', async () => {
-      slackService = createService(true);
-      slackService.client = mockClient;
-      mockClient.chat.postMessage.mockRejectedValue(new Error('API error'));
+    it('should return early when disabled', async () => {
+      slackService = createService(false);
       
+      // Should not throw and should return early
       await expect(slackService.notifyNewSubmission(mockRequestData)).resolves.not.toThrow();
+      expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -422,13 +633,11 @@ describe('Slack Service', () => {
       expect(slackService.isEnabled()).toBe(false);
     });
 
-    it('should handle errors gracefully', async () => {
-      slackService = createService(true);
-      slackService.client = mockClient;
-      mockClient.chat.postMessage.mockRejectedValue(new Error('API error'));
+    it('should return early when disabled', async () => {
+      slackService = createService(false);
       
-      await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult))
-        .resolves.not.toThrow();
+      await expect(slackService.notifyApprovalSuccess(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+      expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -453,13 +662,11 @@ describe('Slack Service', () => {
       expect(slackService.isEnabled()).toBe(false);
     });
 
-    it('should handle errors gracefully', async () => {
-      slackService = createService(true);
-      slackService.client = mockClient;
-      mockClient.chat.postMessage.mockRejectedValue(new Error('API error'));
+    it('should return early when disabled', async () => {
+      slackService = createService(false);
       
-      await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult))
-        .resolves.not.toThrow();
+      await expect(slackService.notifyApprovalFailure(mockRequestData, mockExecutionResult)).resolves.not.toThrow();
+      expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -486,6 +693,13 @@ describe('Slack Service', () => {
       expect(slackService.isEnabled()).toBe(false);
     });
 
+    it('should return early when disabled', async () => {
+      slackService = createService(false);
+      
+      await expect(slackService.notifyRejection(mockRequestData, rejectionReason)).resolves.not.toThrow();
+      expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
+    });
+
     it('should not send when admin not found', async () => {
       slackService = createService(true);
       slackService.client = mockClient;
@@ -494,16 +708,6 @@ describe('Slack Service', () => {
       await slackService.notifyRejection(mockRequestData, rejectionReason);
       
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
-    });
-
-    it('should handle errors gracefully', async () => {
-      slackService = createService(true);
-      slackService.client = mockClient;
-      slackService.getUserIdByEmail = jest.fn().mockResolvedValue('ADMIN123');
-      mockClient.chat.postMessage.mockRejectedValue(new Error('API error'));
-      
-      await expect(slackService.notifyRejection(mockRequestData, rejectionReason))
-        .resolves.not.toThrow();
     });
   });
 });

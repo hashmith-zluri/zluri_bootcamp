@@ -57,6 +57,32 @@ describe('MongoDB Config - Full Coverage', () => {
   });
 
   describe('createMongoConnection', () => {
+    it('should create Atlas connection with mongodb.net host', async () => {
+      const config = {
+        host: 'cluster0.abc123.mongodb.net',
+        database: 'testdb',
+        username: 'admin',
+        password: 'secret@123'
+      };
+
+      const client = await mongoDbConfig.createMongoConnection(config);
+      
+      expect(client).toBeDefined();
+      expect(mockClient.connect).toHaveBeenCalled();
+    });
+
+    it('should create Atlas connection without database', async () => {
+      const config = {
+        host: 'cluster0.abc123.mongodb.net',
+        username: 'admin',
+        password: 'secret'
+      };
+
+      const client = await mongoDbConfig.createMongoConnection(config);
+      
+      expect(client).toBeDefined();
+    });
+
     it('should create connection with username and password', async () => {
       const config = {
         host: 'localhost',

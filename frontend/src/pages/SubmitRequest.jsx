@@ -42,6 +42,7 @@ export default function SubmitRequest() {
   const instanceId = watch('instanceId');
   const requestType = watch('requestType');
   const queryValue = watch('query');
+  const commentsValue = watch('comments');
 
   // Cloned request handlers - extracted to reduce complexity
   const clonedRequestHandlers = {
@@ -485,9 +486,16 @@ await yourFunction();`}
           {/* Query Input (conditional) */}
           {requestType === 'query' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Query <span className="text-red-500">*</span>
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Query <span className="text-red-500">*</span>
+                </label>
+                <span className={`text-xs ${
+                  (queryValue?.length || 0) > 10000 ? 'text-red-500' : 'text-gray-500'
+                }`}>
+                  {queryValue?.length || 0}/10,000 characters
+                </span>
+              </div>
               <CodeEditor
                 code={queryValue || ''}
                 language={dbType === 'MONGO' ? 'javascript' : 'sql'}
@@ -575,9 +583,16 @@ await yourFunction();`}
 
           {/* Comments */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Comments <span className="text-red-500">*</span>
-            </label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Comments <span className="text-red-500">*</span>
+              </label>
+              <span className={`text-xs ${
+                (commentsValue?.length || 0) > 1000 ? 'text-red-500' : 'text-gray-500'
+              }`}>
+                {commentsValue?.length || 0}/1,000 characters
+              </span>
+            </div>
             <textarea
               {...register('comments')}
               rows={3}

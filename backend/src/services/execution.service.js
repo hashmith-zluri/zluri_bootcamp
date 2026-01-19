@@ -6,42 +6,83 @@ const QueryRequestRepository = require('../repositories/queryRequest.repository'
 const ExecutionLogRepository = require('../repositories/executionLog.repository');
 
 class ExecutionService {
+  // Validation utilities using functional approach
+  validateRequest = (request, requestId) => {
+    const validators = [
+      () => request ? null : `Request ${requestId} not found`
+    ];
+    
+    const error = validators.map(validator => validator()).find(result => result !== null);
+    return error ? (() => { throw new Error(error); })() : request;
+  };
+
+  // Executor factory using functional composition
+  createExecutorMap = () => ({
+    QUERY: {
+      POSTGRES: () => postgresExecutionService.executePostgresQuery,
+      MONGO: () => mongoExecutionService.executeMongoQuery
+    },
+    SCRIPT: {
+      POSTGRES: () => postgresScriptExecutionService.executePostgresScript,
+      MONGO: () => mongoScriptExecutionService.executeMongoScript
+    }
+  });
+
+  // Result fetcher factory
+  createResultFetcherMap = () => ({
+    QUERY: {
+      POSTGRES: () => postgresExecutionService.getExecutionResult,
+      MONGO: () => mongoExecutionService.getExecutionResult
+    },
+    SCRIPT: {
+      POSTGRES: () => postgresScriptExecutionService.getScriptExecutionResult,
+      MONGO: () => mongoScriptExecutionService.getScriptExecutionResult
+    }
+  });
+
+  // Functional executor resolver
+  resolveExecutor = (request) => {
+    const { engine, script_path } = request;
+    const type = script_path ? 'SCRIPT' : 'QUERY';
+    const executorMap = this.createExecutorMap();
+    
+    const executor = executorMap[type]?.[engine]?.();
+    if (!executor) {
+      throw new Error(`${type} execution not supported for engine: ${engine}`);
+    }
+    
+    return executor;
+  };
+
+  // Functional result fetcher resolver
+  resolveResultFetcher = (request) => {
+    const { engine, script_path } = request;
+    const type = script_path ? 'SCRIPT' : 'QUERY';
+    const fetcherMap = this.createResultFetcherMap();
+    
+    const fetcher = fetcherMap[type]?.[engine]?.();
+    if (!fetcher) {
+      throw new Error(`Result fetch not supported for ${type} on engine ${engine}`);
+    }
+    
+    return fetcher;
+  };
+
   async executeQuery(requestId) {
     try {
       const request = await QueryRequestRepository.findWithEngine(requestId);
-
-      if (!request) {
-        throw new Error(`Request ${requestId} not found`);
-      }
-
-      const { engine, query_text, script_path } = request;
-
-      const hasQuery = Boolean(query_text);
-      const hasScript = Boolean(script_path);
-
+      this.validateRequest(request, requestId);
+      
+      // Additional validation for execution type
+      const hasQuery = request.query_text;
+      const hasScript = request.script_path;
+      
       if (!hasQuery && !hasScript) {
-        throw new Error('Request has neither query text nor script path');
+        throw new Error(`Request ${requestId} has neither query text nor script path`);
       }
-
-      const executors = {
-        QUERY: {
-          POSTGRES: () => postgresExecutionService.executePostgresQuery(requestId),
-          MONGO: () => mongoExecutionService.executeMongoQuery(requestId)
-        },
-        SCRIPT: {
-          POSTGRES: () => postgresScriptExecutionService.executePostgresScript(requestId),
-          MONGO: () => mongoScriptExecutionService.executeMongoScript(requestId)
-        }
-      };
-
-      const type = hasScript ? 'SCRIPT' : 'QUERY';
-      const executor = executors[type]?.[engine];
-
-      if (!executor) {
-        throw new Error(`${type} execution not supported for engine: ${engine}`);
-      }
-
-      return await executor();
+      
+      const executor = this.resolveExecutor(request);
+      return await executor(requestId);
     } catch (error) {
       console.error(`Execution failed for request ${requestId}:`, error.message);
       throw error;
@@ -67,33 +108,10 @@ class ExecutionService {
   async getExecutionResult(requestId) {
     try {
       const request = await QueryRequestRepository.findWithEngine(requestId);
-
-      if (!request) {
-        throw new Error(`Request ${requestId} not found`);
-      }
-
-      const { engine, script_path } = request;
-      const hasScript = Boolean(script_path);
-
-      const resultFetchers = {
-        QUERY: {
-          POSTGRES: () => postgresExecutionService.getExecutionResult(requestId),
-          MONGO: () => mongoExecutionService.getExecutionResult(requestId)
-        },
-        SCRIPT: {
-          POSTGRES: () => postgresScriptExecutionService.getScriptExecutionResult(requestId),
-          MONGO: () => mongoScriptExecutionService.getScriptExecutionResult(requestId)
-        }
-      };
-
-      const type = hasScript ? 'SCRIPT' : 'QUERY';
-      const fetcher = resultFetchers[type]?.[engine];
-
-      if (!fetcher) {
-        throw new Error(`Result fetch not supported for ${type} on engine ${engine}`);
-      }
-
-      return await fetcher();
+      this.validateRequest(request, requestId);
+      
+      const fetcher = this.resolveResultFetcher(request);
+      return await fetcher(requestId);
     } catch (error) {
       console.error(`Failed to get execution result for request ${requestId}:`, error.message);
       throw error;
@@ -150,23 +168,31 @@ class ExecutionService {
     }
   }
 
+  // Functional output formatting with strategy pattern
   formatOutput(executionResult) {
-    if (!executionResult.success) {
-      return null;
-    }
-
-    if (!executionResult.rows || executionResult.rows.length === 0) {
-      return 'Query executed successfully. No rows returned.';
-    }
-
-    if (executionResult.rows.length > 100) {
-      return `Query executed successfully. ${executionResult.rowCount} rows returned. (First 100 rows shown)\n\n` +
-             JSON.stringify(executionResult.rows.slice(0, 100), null, 2) +
-             `\n\n... and ${executionResult.rowCount - 100} more rows`;
-    }
-
-    return `Query executed successfully. ${executionResult.rowCount} rows returned.\n\n` +
-           JSON.stringify(executionResult.rows, null, 2);
+    const formatStrategies = [
+      // Strategy 1: Handle unsuccessful results
+      (result) => result.success ? undefined : null,
+      
+      // Strategy 2: Handle empty results
+      (result) => (result.rows?.length > 0) ? undefined : 'Query executed successfully. No rows returned.',
+      
+      // Strategy 3: Handle large result sets
+      (result) => (result.rows?.length > 100)
+        ? `Query executed successfully. ${result.rowCount} rows returned. (First 100 rows shown)\n\n` +
+          JSON.stringify(result.rows.slice(0, 100), null, 2) +
+          `\n\n... and ${result.rowCount - 100} more rows`
+        : undefined,
+      
+      // Strategy 4: Handle normal results
+      (result) => `Query executed successfully. ${result.rowCount} rows returned.\n\n` +
+                  JSON.stringify(result.rows, null, 2)
+    ];
+    
+    // Apply first matching strategy
+    return formatStrategies
+      .map(strategy => strategy(executionResult))
+      .find(result => result !== undefined);
   }
 }
 

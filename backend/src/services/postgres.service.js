@@ -4,27 +4,26 @@ const ExecutionLogRepository = require('../repositories/executionLog.repository'
 const slackService = require('./slack.service');
 
 class PostgresExecutionService {
+  // Functional validation with guard clauses
+  validatePostgresRequest = (request, requestId) => {
+    const validations = [
+      () => request ? null : `Request ${requestId} not found`,
+      () => (request?.status === 'APPROVED') ? null : `Request ${requestId} is not approved. Current status: ${request?.status}`,
+      () => (request?.engine === 'POSTGRES') ? null : `Unsupported database engine: ${request?.engine}`,
+      () => request?.query_text ? null : 'No query text found in request'
+    ];
+    
+    const error = validations.map(validation => validation()).find(result => result !== null);
+    return error ? (() => { throw new Error(error); })() : request;
+  };
+
+  // Functional execution pipeline
   async executePostgresQuery(requestId) {
     let executionResult = null;
     
     try {
       const request = await QueryRequestRepository.findWithInstance(requestId);
-
-      if (!request) {
-        throw new Error(`Request ${requestId} not found`);
-      }
-      
-      if (request.status !== 'APPROVED') {
-        throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
-      }
-
-      if (request.engine !== 'POSTGRES') {
-        throw new Error(`Unsupported database engine: ${request.engine}`);
-      }
-
-      if (!request.query_text) {
-        throw new Error('No query text found in request');
-      }
+      this.validatePostgresRequest(request, requestId);
 
       console.log(`Executing PostgreSQL query for request ${requestId}:`);
       console.log(`Instance: ${request.instance_name}`);

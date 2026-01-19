@@ -1,0 +1,1166 @@
+openapi: 3.0.3
+info:
+  title: Database Query Management & Risk Assessment API
+  description: |
+    A comprehensive API for managing database query requests with built-in risk assessment capabilities.
+    
+    ## Features
+    - **Multi-Database Support**: PostgreSQL and MongoDB
+    - **Advanced Risk Assessment**: AST-based SQL analysis and pattern-based security detection
+    - **Approval Workflow**: Manager approval system for database operations
+    - **Audit Trail**: Complete logging of all database operations
+    - **Security-First**: Built-in detection of dangerous operations and injection attacks
+    
+    ## Risk Assessment System
+    The API includes a sophisticated risk assessment system that:
+    - Uses Abstract Syntax Tree (AST) parsing for SQL queries
+    - Detects dangerous operations (DROP, TRUNCATE, DELETE without WHERE)
+    - Identifies JavaScript security patterns (eval, $where, dynamic functions)
+    - Handles MongoDB-specific injection patterns
+    - Provides comprehensive security recommendations
+    
+    ## Authentication
+    All endpoints require JWT authentication via Bearer token.
+    
+  version: 2.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.example.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              developer:
+                summary: Developer login
+                value:
+                  email: "dev1@zluri.com"
+                  password: "pass1"
+              manager:
+                summary: Manager login
+                value:
+                  email: "manager1@zluri.com"
+                  password: "pass1"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                success:
+                  summary: Successful login
+                  value:
+                    jwtToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    success: true
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_credentials:
+                  summary: Invalid email or password
+                  value:
+                    success: false
+                    message: "Invalid email or password"
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate current JWT token
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  summary: Successful logout
+                  value:
+                    success: true
+                    message: "Logged out successfully"
+
+  # Database Management Endpoints
+  /db/types:
+    get:
+      tags:
+        - Database Management
+      summary: Get supported database types
+      description: Retrieve list of all supported database types
+      responses:
+        '200':
+          description: Database types retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseTypesResponse'
+              examples:
+                types:
+                  summary: Available database types
+                  value:
+                    success: true
+                    types: ["POSTGRES", "MONGO"]
+
+  /db/instances:
+    get:
+      tags:
+        - Database Management
+      summary: Get database instances
+      description: Retrieve database instances filtered by type
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [POSTGRES, MONGO]
+          description: Database type to filter instances
+          example: POSTGRES
+      responses:
+        '200':
+          description: Database instances retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseInstancesResponse'
+              examples:
+                postgres_instances:
+                  summary: PostgreSQL instances
+                  value:
+                    success: true
+                    instances:
+                      - id: "1"
+                        name: "local-postgres"
+                      - id: "2"
+                        name: "staging-postgres"
+        '400':
+          description: Missing or invalid type parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /db/instances/{id}/name:
+    get:
+      tags:
+        - Database Management
+      summary: Get databases in instance
+      description: Retrieve all databases available in a specific database instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Database instance ID
+          example: "1"
+      responses:
+        '200':
+          description: Databases retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseNamesResponse'
+              examples:
+                postgres_databases:
+                  summary: PostgreSQL databases
+                  value:
+                    success: true
+                    databases: ["postgres", "template0", "template1", "test_ecommerce"]
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Request Management Endpoints
+  /request:
+    post:
+      tags:
+        - Request Management
+      summary: Submit query request
+      description: |
+        Submit a new database query or script request for approval.
+        
+        ## Risk Assessment
+        All requests are automatically analyzed for security risks:
+        - **SQL Queries**: AST-based analysis detects dangerous operations
+        - **Scripts**: Pattern analysis identifies security vulnerabilities
+        - **Risk Levels**: Critical, High, Medium, Low with detailed reasons
+        
+        ## Request Types
+        - **Query**: Direct SQL/MongoDB query execution
+        - **Script**: JavaScript code with database operations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/QueryRequest'
+                - $ref: '#/components/schemas/ScriptRequest'
+            examples:
+              postgres_query:
+                summary: PostgreSQL Query Request
+                value:
+                  databasetype: "POSTGRES"
+                  instanceid: "1"
+                  dbname: "postgres"
+                  query: "SELECT * FROM users WHERE active = true LIMIT 10;"
+                  comments: "Need to check active user data"
+                  podid: "pod-1"
+              postgres_script:
+                summary: PostgreSQL Script Request
+                value:
+                  databasetype: "POSTGRES"
+                  instanceid: "1"
+                  dbname: "postgres"
+                  script: "async function getUsers() { const result = await query('SELECT * FROM users'); console.log('Users:', result.rows.length); }"
+                  comments: "Execute user analysis script"
+                  podid: "pod-1"
+              mongo_query:
+                summary: MongoDB Query Request
+                value:
+                  databasetype: "MONGO"
+                  instanceid: "2"
+                  dbname: "test_mongo"
+                  query: "db.users.find({status: 'active'})"
+                  comments: "Fetch active users"
+                  podid: "pod-1"
+              dangerous_query:
+                summary: High-Risk Query (will be flagged)
+                value:
+                  databasetype: "POSTGRES"
+                  instanceid: "1"
+                  dbname: "postgres"
+                  query: "DROP TABLE users;"
+                  comments: "Clean up old data"
+                  podid: "pod-1"
+      responses:
+        '200':
+          description: Request submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestSubmissionResponse'
+              examples:
+                success:
+                  summary: Request submitted
+                  value:
+                    success: true
+                    req_id: "123"
+                    status: "PENDING"
+                    riskAssessment:
+                      level: "critical"
+                      score: 6
+                      reasons: ["DROP operation - permanently deletes data"]
+                      recommendations: 
+                        - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
+                        - "🔒 Consider requiring additional approval for execution"
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /requests/mine:
+    get:
+      tags:
+        - Request Management
+      summary: Get user requests
+      description: Retrieve all requests submitted by the authenticated user, including execution results
+      responses:
+        '200':
+          description: User requests retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRequestsResponse'
+              examples:
+                executed_request:
+                  summary: Executed PostgreSQL Query
+                  value:
+                    success: true
+                    requests:
+                      - req_id: 47
+                        query: "SELECT * FROM users LIMIT 1;"
+                        script: null
+                        status: "EXECUTED"
+                        database_name: "test_ecommerce"
+                        comments: "Need to check"
+                        pod_id: "db"
+                        created_at: "2026-01-09T12:41:34.523Z"
+                        approved_at: "2026-01-09T12:43:33.448Z"
+                        requester_email: "dev1@zluri.com"
+                        requester_name: "Dev1"
+                        instance_name: "local-postgres"
+                        database_type: "POSTGRES"
+                        riskAssessment:
+                          level: "low"
+                          score: 0
+                          reasons: ["Read-only operation - safe to execute"]
+                        result:
+                          output: "Query executed successfully. 1 rows returned.\n\n[{\"id\": 1, \"email\": \"john@example.com\", \"name\": \"John Doe\"}]"
+                          response_time: 3
+                          status: "success"
+                          error: null
+                          executed_at: "2026-01-09T12:43:33.477Z"
+
+  /requests/{reqid}/result:
+    get:
+      tags:
+        - Request Management
+      summary: Get request execution result
+      description: Retrieve the execution result for a specific request
+      parameters:
+        - name: reqid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Request ID
+          example: "123"
+      responses:
+        '200':
+          description: Execution result retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResultResponse'
+              examples:
+                success:
+                  summary: Successful execution
+                  value:
+                    success: true
+                    output: "Query executed successfully. 10 rows returned."
+                    response_time: 150
+                    status: "success"
+                    error: null
+                failure:
+                  summary: Failed execution
+                  value:
+                    success: true
+                    output: null
+                    response_time: 50
+                    status: "failure"
+                    error: "Syntax error in SQL query"
+                pending:
+                  summary: Not executed yet
+                  value:
+                    success: true
+                    output: null
+                    response_time: null
+                    status: "pending"
+                    message: "Request not yet executed"
+        '404':
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Approval Management Endpoints
+  /approvals:
+    get:
+      tags:
+        - Approval Management
+      summary: Get pending approval requests
+      description: |
+        Retrieve all pending requests for the manager's assigned pods.
+        
+        ## Risk Assessment Integration
+        Each request includes comprehensive risk assessment data to help managers make informed approval decisions:
+        - **Risk Level**: Critical, High, Medium, Low
+        - **Risk Score**: Numerical score (0-10+)
+        - **Detailed Reasons**: Specific security concerns identified
+        - **Recommendations**: Actionable security guidance
+      responses:
+        '200':
+          description: Approval requests retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRequestsResponse'
+              examples:
+                pending_requests:
+                  summary: Pending approval requests with risk assessment
+                  value:
+                    success: true
+                    requests:
+                      - reqid: "123"
+                        query: "DROP TABLE old_logs;"
+                        script: null
+                        status: "PENDING"
+                        database_name: "postgres"
+                        comments: "Clean up old log data"
+                        pod_id: "pod-1"
+                        created_at: "2024-01-15T10:30:00Z"
+                        requester_email: "dev1@zluri.com"
+                        requester_name: "Dev1"
+                        instance_name: "local-postgres"
+                        database_type: "POSTGRES"
+                        riskAssessment:
+                          level: "critical"
+                          score: 6
+                          reasons: ["DROP operation - permanently deletes data"]
+                          recommendations:
+                            - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
+                            - "🔒 Consider requiring additional approval for execution"
+                            - "📋 Ensure you have a backup before proceeding"
+
+  /approvals/{reqId}/action:
+    post:
+      tags:
+        - Approval Management
+      summary: Approve or reject request
+      description: |
+        Approve or reject a pending request.
+        
+        ## Security Considerations
+        Managers should carefully review the risk assessment before approving:
+        - **Critical Risk**: Requires senior developer review
+        - **High Risk**: Verify WHERE clauses and conditions
+        - **Medium Risk**: Standard review recommended
+        - **Low Risk**: Safe to execute
+      parameters:
+        - name: reqId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Request ID
+          example: "123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalActionRequest'
+            examples:
+              approve:
+                summary: Approve request
+                value:
+                  action: "approve"
+              reject:
+                summary: Reject request
+                value:
+                  action: "reject"
+                  reason: "Query needs modification before approval"
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalActionResponse'
+              examples:
+                approved:
+                  summary: Request approved
+                  value:
+                    success: true
+                    status: "approval"
+                rejected:
+                  summary: Request rejected
+                  value:
+                    success: true
+                    status: "reject"
+                    reason: "Query needs modification before approval"
+
+  # Risk Assessment Endpoints
+  /risk/assess:
+    post:
+      tags:
+        - Risk Assessment
+      summary: Analyze query/script risk
+      description: |
+        Perform comprehensive risk assessment on SQL queries or JavaScript scripts.
+        
+        ## Analysis Methods
+        - **SQL Queries**: AST-based structural analysis
+        - **JavaScript Scripts**: Pattern-based security analysis
+        - **MongoDB Operations**: NoSQL injection detection
+        
+        ## Risk Levels
+        - **Critical (6+ points)**: Immediate danger operations (DROP, TRUNCATE)
+        - **High (4-5 points)**: Significant risk operations (ALTER, GRANT)
+        - **Medium (2-3 points)**: Standard operations with some risk (UPDATE, INSERT)
+        - **Low (0-1 points)**: Safe read-only operations (SELECT, FIND)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskAssessmentRequest'
+            examples:
+              sql_query:
+                summary: SQL Query Analysis
+                value:
+                  query: "DROP TABLE users;"
+                  dbType: "POSTGRES"
+              javascript_script:
+                summary: JavaScript Script Analysis
+                value:
+                  script: "async function deleteUsers() { await query('DELETE FROM users WHERE active = false'); }"
+                  dbType: "POSTGRES"
+              mongodb_query:
+                summary: MongoDB Query Analysis
+                value:
+                  script: "db.collection('users').deleteMany({})"
+                  dbType: "MONGO"
+      responses:
+        '200':
+          description: Risk assessment completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAssessmentResponse'
+              examples:
+                critical_risk:
+                  summary: Critical Risk Detection
+                  value:
+                    success: true
+                    assessment:
+                      level: "critical"
+                      score: 6
+                      reasons: ["DROP operation - permanently deletes data"]
+                      recommendations:
+                        - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
+                        - "🔒 Consider requiring additional approval for execution"
+                        - "📋 Ensure you have a backup before proceeding"
+                        - "⏰ Execute during maintenance window if possible"
+                      analysis:
+                        method: "sql-ast"
+                        astUsed: true
+                        detailedRisks:
+                          - type: "critical"
+                            reason: "DROP table - permanently deletes data"
+                            location: "root"
+                low_risk:
+                  summary: Low Risk Detection
+                  value:
+                    success: true
+                    assessment:
+                      level: "low"
+                      score: 0
+                      reasons: ["Read-only operation - safe to execute"]
+                      recommendations:
+                        - "✅ LOW RISK: Safe to execute"
+                      analysis:
+                        method: "sql-ast"
+                        astUsed: true
+
+  /risk/validate-syntax:
+    post:
+      tags:
+        - Risk Assessment
+      summary: Validate SQL syntax
+      description: Validate SQL query syntax without executing it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyntaxValidationRequest'
+            examples:
+              valid_sql:
+                summary: Valid SQL Query
+                value:
+                  sql: "SELECT * FROM users WHERE id = 1"
+                  dbType: "POSTGRES"
+              invalid_sql:
+                summary: Invalid SQL Query
+                value:
+                  sql: "SELECT * FROM WHERE INVALID"
+                  dbType: "POSTGRES"
+      responses:
+        '200':
+          description: Syntax validation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyntaxValidationResponse'
+              examples:
+                valid:
+                  summary: Valid syntax
+                  value:
+                    success: true
+                    valid: true
+                    error: null
+                invalid:
+                  summary: Invalid syntax
+                  value:
+                    success: true
+                    valid: false
+                    error: "Syntax error: Expected table name after FROM"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "dev1@zluri.com"
+        password:
+          type: string
+          description: User password
+          example: "pass1"
+
+    LoginResponse:
+      type: object
+      properties:
+        jwtToken:
+          type: string
+          description: JWT authentication token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        success:
+          type: boolean
+          example: true
+
+    # Database Management Schemas
+    DatabaseTypesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        types:
+          type: array
+          items:
+            type: string
+            enum: [POSTGRES, MONGO]
+          example: ["POSTGRES", "MONGO"]
+
+    DatabaseInstancesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatabaseInstance'
+
+    DatabaseInstance:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Instance ID
+          example: "1"
+        name:
+          type: string
+          description: Instance name
+          example: "local-postgres"
+
+    DatabaseNamesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        databases:
+          type: array
+          items:
+            type: string
+          example: ["postgres", "template0", "template1"]
+
+    # Request Management Schemas
+    QueryRequest:
+      type: object
+      required:
+        - databasetype
+        - instanceid
+        - dbname
+        - query
+        - podid
+      properties:
+        databasetype:
+          type: string
+          enum: [POSTGRES, MONGO]
+          description: Database type
+          example: "POSTGRES"
+        instanceid:
+          type: string
+          description: Database instance ID
+          example: "1"
+        dbname:
+          type: string
+          description: Database name
+          example: "postgres"
+        query:
+          type: string
+          description: SQL or MongoDB query to execute
+          example: "SELECT * FROM users LIMIT 10;"
+        comments:
+          type: string
+          description: Optional comments about the request
+          example: "Need to check user data"
+        podid:
+          type: string
+          description: Pod ID for approval routing
+          example: "pod-1"
+
+    ScriptRequest:
+      type: object
+      required:
+        - databasetype
+        - instanceid
+        - dbname
+        - script
+        - podid
+      properties:
+        databasetype:
+          type: string
+          enum: [POSTGRES, MONGO]
+          description: Database type
+          example: "POSTGRES"
+        instanceid:
+          type: string
+          description: Database instance ID
+          example: "1"
+        dbname:
+          type: string
+          description: Database name
+          example: "postgres"
+        script:
+          type: string
+          description: JavaScript code to execute
+          example: "async function getUsers() { const result = await query('SELECT * FROM users'); console.log('Users:', result.rows.length); }"
+        comments:
+          type: string
+          description: Optional comments about the request
+          example: "Execute user analysis script"
+        podid:
+          type: string
+          description: Pod ID for approval routing
+          example: "pod-1"
+
+    RequestSubmissionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        req_id:
+          type: string
+          description: Generated request ID
+          example: "123"
+        status:
+          type: string
+          enum: [PENDING]
+          example: "PENDING"
+        riskAssessment:
+          $ref: '#/components/schemas/RiskAssessment'
+
+    UserRequestsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRequest'
+
+    UserRequest:
+      type: object
+      properties:
+        req_id:
+          type: integer
+          description: Request ID
+          example: 47
+        query:
+          type: string
+          nullable: true
+          description: SQL/MongoDB query (null if script request)
+          example: "SELECT * FROM users LIMIT 1;"
+        script:
+          type: string
+          nullable: true
+          description: JavaScript code (null if query request)
+        status:
+          type: string
+          enum: [PENDING, APPROVED, EXECUTING, EXECUTED, FAILED, REJECTED]
+          example: "EXECUTED"
+        database_name:
+          type: string
+          example: "test_ecommerce"
+        comments:
+          type: string
+          example: "Need to check"
+        pod_id:
+          type: string
+          example: "db"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-09T12:41:34.523Z"
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-01-09T12:43:33.448Z"
+        requester_email:
+          type: string
+          example: "dev1@zluri.com"
+        requester_name:
+          type: string
+          example: "Dev1"
+        instance_name:
+          type: string
+          example: "local-postgres"
+        database_type:
+          type: string
+          enum: [POSTGRES, MONGO]
+          example: "POSTGRES"
+        riskAssessment:
+          $ref: '#/components/schemas/RiskAssessment'
+        result:
+          $ref: '#/components/schemas/ExecutionResult'
+          nullable: true
+
+    ExecutionResult:
+      type: object
+      properties:
+        output:
+          type: string
+          nullable: true
+          description: Execution output or result data
+        response_time:
+          type: integer
+          nullable: true
+          description: Execution time in milliseconds
+        status:
+          type: string
+          enum: [success, failure, pending]
+        error:
+          type: string
+          nullable: true
+          description: Error message if execution failed
+        executed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExecutionResultResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        output:
+          type: string
+          nullable: true
+        response_time:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [success, failure, pending]
+        error:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+          description: Additional status message
+
+    # Approval Management Schemas
+    ApprovalRequestsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalRequest'
+
+    ApprovalRequest:
+      type: object
+      properties:
+        reqid:
+          type: string
+          example: "123"
+        query:
+          type: string
+          nullable: true
+        script:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [PENDING]
+          example: "PENDING"
+        database_name:
+          type: string
+          example: "postgres"
+        comments:
+          type: string
+          example: "Need to check user data"
+        pod_id:
+          type: string
+          example: "pod-1"
+        created_at:
+          type: string
+          format: date-time
+        requester_email:
+          type: string
+          example: "dev1@zluri.com"
+        requester_name:
+          type: string
+          example: "Dev1"
+        instance_name:
+          type: string
+          example: "local-postgres"
+        database_type:
+          type: string
+          enum: [POSTGRES, MONGO]
+        riskAssessment:
+          $ref: '#/components/schemas/RiskAssessment'
+
+    ApprovalActionRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          enum: [approve, reject]
+          description: Action to perform
+          example: "approve"
+        reason:
+          type: string
+          description: Reason for rejection (required if action is reject)
+          example: "Query needs modification before approval"
+
+    ApprovalActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum: [approval, reject]
+          example: "approval"
+        reason:
+          type: string
+          nullable: true
+          description: Rejection reason (only present if rejected)
+
+    # Risk Assessment Schemas
+    RiskAssessmentRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          nullable: true
+          description: SQL or MongoDB query to analyze
+          example: "DROP TABLE users;"
+        script:
+          type: string
+          nullable: true
+          description: JavaScript code to analyze
+          example: "async function deleteUsers() { await query('DELETE FROM users'); }"
+        dbType:
+          type: string
+          enum: [POSTGRES, MONGO, MYSQL]
+          description: Database type for analysis context
+          example: "POSTGRES"
+
+    RiskAssessmentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        assessment:
+          $ref: '#/components/schemas/RiskAssessment'
+
+    RiskAssessment:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Overall risk level
+          example: "critical"
+        score:
+          type: integer
+          description: Numerical risk score
+          example: 6
+        reasons:
+          type: array
+          items:
+            type: string
+          description: List of identified security concerns
+          example: ["DROP operation - permanently deletes data"]
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: Security recommendations and best practices
+          example: 
+            - "🚨 CRITICAL: This operation should be reviewed by a senior developer"
+            - "🔒 Consider requiring additional approval for execution"
+        analysis:
+          $ref: '#/components/schemas/RiskAnalysisMetadata'
+
+    RiskAnalysisMetadata:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [sql-ast, javascript, none, error]
+          description: Analysis method used
+          example: "sql-ast"
+        astUsed:
+          type: boolean
+          description: Whether AST parsing was used
+          example: true
+        fallbackUsed:
+          type: boolean
+          description: Whether fallback analysis was used
+          example: false
+        parseError:
+          type: string
+          nullable: true
+          description: Parse error if AST analysis failed
+        detailedRisks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetailedRisk'
+
+    DetailedRisk:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [low, medium, high, critical]
+          example: "critical"
+        reason:
+          type: string
+          example: "DROP table - permanently deletes data"
+        location:
+          type: string
+          description: Location in code where risk was detected
+          example: "root"
+
+    SyntaxValidationRequest:
+      type: object
+      required:
+        - sql
+        - dbType
+      properties:
+        sql:
+          type: string
+          description: SQL query to validate
+          example: "SELECT * FROM users WHERE id = 1"
+        dbType:
+          type: string
+          enum: [POSTGRES, MYSQL]
+          description: Database type for syntax validation
+          example: "POSTGRES"
+
+    SyntaxValidationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        valid:
+          type: boolean
+          description: Whether the SQL syntax is valid
+          example: true
+        error:
+          type: string
+          nullable: true
+          description: Syntax error message if invalid
+
+    # Common Schemas
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Error description
+          example: "Invalid request parameters"
+        error:
+          type: string
+          nullable: true
+          description: Detailed error information
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Database Management
+    description: Database instance and type management
+  - name: Request Management
+    description: Query and script request submission and tracking
+  - name: Approval Management
+    description: Manager approval workflow for database operations
+  - name: Risk Assessment
+    description: Security analysis and risk assessment for queries and scripts

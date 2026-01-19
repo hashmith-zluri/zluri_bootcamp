@@ -12,10 +12,13 @@ export const querySubmissionSchema = z.object({
   instanceId: z.string().min(1, 'Instance is required'),
   databaseName: z.string().min(1, 'Database is required'),
   requestType: z.enum(['query', 'script'], { required_error: 'Request type is required' }),
-  query: z.string().optional(),
+  query: z.string()
+    .max(10000, 'Query cannot exceed 10,000 characters')
+    .optional(),
   script: z.string().optional(),
   comments: z.string()
     .min(1, 'Comments are required')
+    .max(1000, 'Comments cannot exceed 1,000 characters')
     .refine((val) => val.trim().length > 0, {
       message: 'Comments cannot be empty or contain only spaces',
     }),

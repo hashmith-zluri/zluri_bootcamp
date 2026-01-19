@@ -134,6 +134,28 @@ describe('Database Configuration (db.js)', () => {
       expect(result.rowCount).toBe(1);
     });
 
+    it('should handle query with null result rows', async () => {
+      const { __mockQuery } = require('@mikro-orm/postgresql');
+      __mockQuery.mockResolvedValueOnce({ rows: null, rowCount: 0 });
+      
+      await initORM();
+      const result = await query('SELECT * FROM empty_table');
+      
+      expect(result.rows).toEqual([]);
+      expect(result.rowCount).toBe(0);
+    });
+
+    it('should handle query with undefined rowCount', async () => {
+      const { __mockQuery } = require('@mikro-orm/postgresql');
+      __mockQuery.mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: undefined });
+      
+      await initORM();
+      const result = await query('SELECT * FROM users');
+      
+      expect(result.rows).toHaveLength(1);
+      expect(result.rowCount).toBe(0);
+    });
+
     it('should use default empty params array', async () => {
       await initORM();
       

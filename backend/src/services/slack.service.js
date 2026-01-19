@@ -103,39 +103,73 @@ class SlackService {
   }
 
   /**
-   * Format execution output for display
+   * Functional output formatting with strategy pattern
    */
   formatExecutionOutput(output) {
-    if (!output) return 'No output';
-    
-    try {
-      // Try to parse as JSON (both script and query outputs are JSON formatted)
-      const parsed = JSON.parse(output);
+    const formatStrategies = [
+      // Strategy 1: Handle null/undefined
+      (out) => !out ? 'No output' : undefined,
       
-      // Check if it has both console_output and result_data (query format)
-      if (parsed.console_output !== undefined && parsed.result_data !== undefined) {
-        const resultData = parsed.result_data;
-        if (Array.isArray(resultData) && resultData.length > 0) {
-          const sampleSize = Math.min(3, resultData.length);
-          const sample = resultData.slice(0, sampleSize);
-          const showingText = resultData.length > sampleSize 
-            ? `Showing ${sampleSize} of ${resultData.length} results` 
-            : `${resultData.length} result${resultData.length > 1 ? 's' : ''}`;
-          return `${parsed.console_output}\n\n${showingText}:\n${JSON.stringify(sample, null, 2)}`;
+      // Strategy 2: Parse and format JSON
+      (out) => {
+        try {
+          const parsed = JSON.parse(out);
+          return this.formatParsedOutput(parsed);
+        } catch (e) {
+          return out; // Not JSON, return as-is
         }
-        // If no results, still show the console output
-        return parsed.console_output || 'Query executed successfully. No rows returned.';
-      } else if (parsed.console_output) {
-        // Script output format - just console output
-        return parsed.console_output || 'Script executed successfully';
       }
+    ];
+    
+    return formatStrategies
+      .map(strategy => strategy(output))
+      .find(result => result !== undefined);
+  }
+
+  /**
+   * Format parsed JSON output with functional approach
+   */
+  formatParsedOutput(parsed) {
+    const outputFormatters = [
+      // Query format with result_data
+      (data) => (data.console_output !== undefined && data.result_data !== undefined)
+        ? this.formatQueryOutput(data)
+        : undefined,
       
-      // If it's just a JSON object, stringify it nicely
-      return JSON.stringify(parsed, null, 2);
-    } catch (e) {
-      // Not JSON, return as-is
-      return output;
+      // Script format with console_output only
+
+      (data) => data.console_output 
+        ? (data.console_output || 'Script executed successfully')
+        : undefined,
+      
+      // Generic JSON object
+      (data) => JSON.stringify(data, null, 2)
+    ];
+    
+    return outputFormatters
+      .map(formatter => formatter(parsed))
+      .find(result => result !== undefined);
+  }
+
+  /**
+   * Format query output with results
+   */
+  formatQueryOutput(data) {
+    const { console_output, result_data } = data;
+    
+    /*Istanbul ignore next*/
+    if (!Array.isArray(result_data) || result_data.length === 0) {
+      return console_output || 'Query executed successfully. No rows returned.';
     }
+    
+    const sampleSize = Math.min(3, result_data.length);
+    const sample = result_data.slice(0, sampleSize);
+    /*Istanbul ignore next*/
+    const showingText = result_data.length > sampleSize 
+      ? `Showing ${sampleSize} of ${result_data.length} results` 
+      : `${result_data.length} result${result_data.length > 1 ? 's' : ''}`;
+    
+    return `${console_output}\n\n${showingText}:\n${JSON.stringify(sample, null, 2)}`;
   }
 
   /**
@@ -206,7 +240,6 @@ class SlackService {
    * 3. Approval + Failure Notification
    * Sent to: Common channel + Admin DM
    */
-  /*Istanbul ignore next*/
   async notifyApprovalFailure(requestData, executionResult) {
     if (!this.enabled) return;
 
@@ -347,5 +380,4 @@ class SlackService {
     }
   }
 }
-
 module.exports = new SlackService();

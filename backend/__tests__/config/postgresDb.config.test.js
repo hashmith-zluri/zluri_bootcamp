@@ -53,6 +53,46 @@ describe('PostgresDb Config', () => {
       const pool = postgresDbConfig.createTargetDbConnection({ database: 'testdb' });
       expect(pool).toBeDefined();
     });
+
+    it('should enable SSL for Neon databases', () => {
+      const config = {
+        host: 'ep-test-123.us-east-1.aws.neon.tech',
+        database: 'neondb',
+        username: 'user',
+        password: 'pass'
+      };
+
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      const pool = postgresDbConfig.createTargetDbConnection(config);
+      
+      expect(pool).toBeDefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('SSL enabled for Neon database')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should not enable SSL for non-Neon databases', () => {
+      const config = {
+        host: 'localhost',
+        database: 'localdb',
+        username: 'user',
+        password: 'pass'
+      };
+
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      const pool = postgresDbConfig.createTargetDbConnection(config);
+      
+      expect(pool).toBeDefined();
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('SSL enabled')
+      );
+      
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('executeTargetQuery', () => {

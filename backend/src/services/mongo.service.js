@@ -10,21 +10,19 @@ class MongoExecutionService {
     try {
       const request = await QueryRequestRepository.findWithInstance(requestId);
 
-      if (!request) {
-        throw new Error(`Request ${requestId} not found`);
-      }
-      
-      if (request.status !== 'APPROVED') {
-        throw new Error(`Request ${requestId} is not approved. Current status: ${request.status}`);
-      }
+      // Functional validation chain - throws on first failure
+      const validateMongoRequest = (req, id) => {
+        const validationError = [
+          () => req ? null : `Request ${id} not found`,
+          () => (req?.status === 'APPROVED') ? null : `Request ${id} is not approved. Current status: ${req?.status}`,
+          () => (req?.engine === 'MONGO') ? null : `Expected MongoDB instance, got: ${req?.engine}`,
+          () => req?.query_text ? null : 'No query text found in request'
+        ].map(validator => validator()).find(error => error !== null);
+        
+        return validationError ? (() => { throw new Error(validationError); })() : req;
+      };
 
-      if (request.engine !== 'MONGO') {
-        throw new Error(`Expected MongoDB instance, got: ${request.engine}`);
-      }
-
-      if (!request.query_text) {
-        throw new Error('No query text found in request');
-      }
+      validateMongoRequest(request, requestId);
 
       console.log(`Executing MongoDB query for request ${requestId}:`);
       console.log(`Instance: ${request.instance_name}`);
@@ -111,9 +109,9 @@ class MongoExecutionService {
 
       if (executionResult.success) {
         await slackService.notifyApprovalSuccess(slackRequestData, executionResult);
-      } else {
+        return;
+      } 
         await slackService.notifyApprovalFailure(slackRequestData, executionResult);
-      }
     } catch (error) {
       console.error(`Failed to send Slack notification for request ${requestId}:`, error.message);
     }
@@ -184,20 +182,21 @@ class MongoExecutionService {
   }
 
   async executeMultipleQueries(requestIds) {
-    const results = [];
-    
-    for (const requestId of requestIds) {
+    // Execute all queries in parallel for better performance
+    const promises = requestIds.map(async (requestId) => {
       try {
         const result = await this.executeMongoQuery(requestId);
-        results.push(result);
+        return result;
       } catch (error) {
-        results.push({
+        return {
           requestId,
           success: false,
           error: error.message
-        });
+        };
       }
-    }
+    });
+    
+    const results = await Promise.all(promises);
     
     return results;
   }

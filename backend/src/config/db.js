@@ -7,13 +7,8 @@ const {
   InstanceDatabaseSchema 
 } = require('../entities');
 
-/** @type {MikroORM} */
 let orm = null;
 
-/**
- * Initialize MikroORM connection
- * @returns {Promise<MikroORM>}
- */
 const initORM = async () => {
   if (!orm) {
     orm = await MikroORM.init({
@@ -23,8 +18,6 @@ const initORM = async () => {
       port: parseInt(process.env.DB_PORT) || 5432,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
-      
-      // SSL configuration for Neon (REQUIRED)
       driverOptions: {
         connection: {
           ssl: {
@@ -45,10 +38,6 @@ const initORM = async () => {
   return orm;
 };
 
-/**
- * Get the ORM instance
- * @returns {MikroORM}
- */
 const getORM = () => {
   if (!orm) {
     throw new Error('ORM not initialized. Call initORM() first.');
@@ -56,18 +45,10 @@ const getORM = () => {
   return orm;
 };
 
-/**
- * Get a forked EntityManager
- * @returns {import('@mikro-orm/postgresql').EntityManager}
- */
 const getEM = () => {
   return getORM().em.fork();
 };
 
-/**
- * Close the ORM connection
- * @returns {Promise<void>}
- */
 const closeORM = async () => {
   if (orm) {
     await orm.close();
@@ -76,12 +57,6 @@ const closeORM = async () => {
   }
 };
 
-/**
- * Execute a raw SQL query using MikroORM's connection
- * @param {string} text - SQL query text
- * @param {Array} params - Query parameters
- * @returns {Promise<{rows: Array, rowCount: number}>}
- */
 const query = async (text, params = []) => {
   const start = Date.now();
   const em = getEM();
@@ -104,7 +79,6 @@ const query = async (text, params = []) => {
       });
     }
 
-    // Format result to match pg's result format for backward compatibility
     return {
       rows: result.rows || [],
       rowCount: result.rowCount || 0

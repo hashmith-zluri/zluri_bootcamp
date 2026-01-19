@@ -145,6 +145,29 @@ describe('DB Controller', () => {
       });
     });
 
+    it('should return empty array when no databases found', async () => {
+      const mockInstance = {
+        name: 'postgres-empty',
+        host: 'localhost',
+        port: 5432,
+        engine: 'POSTGRES',
+        database: 'postgres'
+      };
+
+      query
+        .mockResolvedValueOnce({ rows: [mockInstance] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const response = await request(app)
+        .get('/api/v1/db/instances/1/name');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        databases: []
+      });
+    });
+
     it('should return 404 when instance not found', async () => {
       query.mockResolvedValue({ rows: [] });
 
@@ -175,10 +198,91 @@ describe('DB Controller', () => {
       });
     });
 
+    it('should return 400 for Redis engine', async () => {
+      const mockInstance = {
+        name: 'redis-cache',
+        engine: 'REDIS'
+      };
+      query.mockResolvedValue({ rows: [mockInstance] });
+
+      const response = await request(app)
+        .get('/api/v1/db/instances/1/name');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Unsupported database engine: REDIS'
+      });
+    });
+
     it('should handle database errors', async () => {
       query.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
+        .get('/api/v1/db/instances/1/name');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Failed to fetch databases'
+      });
+    });
+
+    it('should handle database connection timeout', async () => {
+      query.mockRejectedValue(new Error('Connection timeout'));
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const response = await request(app)
+        .get('/api/v1/db/instances/1/name');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Failed to fetch databases'
+      });
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Get databases by instance failed:',
+        'Connection timeout'
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle instance service returning null', async () => {
+      // Mock the service to return null instead of using query directly
+      jest.resetModules();
+      jest.doMock('../../src/services/db.service', () => ({
+        getInstanceById: jest.fn().mockResolvedValue(null),
+        getDatabasesByInstanceId: jest.fn()
+      }));
+
+      const appWithMockedService = require('../../src/app');
+
+      const response = await request(appWithMockedService)
+        .get('/api/v1/db/instances/999/name');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Instance not found'
+      });
+    });
+
+    it('should handle service throwing error during database fetch', async () => {
+      jest.resetModules();
+      jest.doMock('../../src/services/db.service', () => ({
+        getInstanceById: jest.fn().mockResolvedValue({
+          name: 'test-instance',
+          engine: 'POSTGRES'
+        }),
+        getDatabasesByInstanceId: jest.fn().mockRejectedValue(new Error('Service error'))
+      }));
+
+      const appWithMockedService = require('../../src/app');
+
+      const response = await request(appWithMockedService)
         .get('/api/v1/db/instances/1/name');
 
       expect(response.status).toBe(500);

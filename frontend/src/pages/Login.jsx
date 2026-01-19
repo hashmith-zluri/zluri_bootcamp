@@ -39,47 +39,65 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">Database Query Portal</h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to your account</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-lg shadow-md p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Database Query Portal</h2>
+            <p className="mt-2 text-sm text-gray-600">Sign in to your account</p>
+          </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-4">
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
               <input
                 id="email"
                 type="email"
                 {...register('email')}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.email ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Enter your email"
               />
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+              )}
             </div>
+
+            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
               <input
                 id="password"
                 type="password"
                 {...register('password')}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.password ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Enter your password"
               />
-              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+              )}
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2 px-4 border border-transparent rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
