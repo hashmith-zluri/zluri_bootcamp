@@ -19,24 +19,24 @@ class ExecutionService {
   // Executor factory using functional composition
   createExecutorMap = () => ({
     QUERY: {
-      POSTGRES: () => postgresExecutionService.executePostgresQuery,
-      MONGO: () => mongoExecutionService.executeMongoQuery
+      POSTGRES: () => postgresExecutionService.executePostgresQuery.bind(postgresExecutionService),
+      MONGO: () => mongoExecutionService.executeMongoQuery.bind(mongoExecutionService)
     },
     SCRIPT: {
-      POSTGRES: () => postgresScriptExecutionService.executePostgresScript,
-      MONGO: () => mongoScriptExecutionService.executeMongoScript
+      POSTGRES: () => postgresScriptExecutionService.executePostgresScript.bind(postgresScriptExecutionService),
+      MONGO: () => mongoScriptExecutionService.executeMongoScript.bind(mongoScriptExecutionService)
     }
   });
 
   // Result fetcher factory
   createResultFetcherMap = () => ({
     QUERY: {
-      POSTGRES: () => postgresExecutionService.getExecutionResult,
-      MONGO: () => mongoExecutionService.getExecutionResult
+      POSTGRES: () => postgresExecutionService.getExecutionResult.bind(postgresExecutionService),
+      MONGO: () => mongoExecutionService.getExecutionResult.bind(mongoExecutionService)
     },
     SCRIPT: {
-      POSTGRES: () => postgresScriptExecutionService.getScriptExecutionResult,
-      MONGO: () => mongoScriptExecutionService.getScriptExecutionResult
+      POSTGRES: () => postgresScriptExecutionService.getScriptExecutionResult.bind(postgresScriptExecutionService),
+      MONGO: () => mongoScriptExecutionService.getScriptExecutionResult.bind(mongoScriptExecutionService)
     }
   });
 
