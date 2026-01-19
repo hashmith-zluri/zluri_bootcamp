@@ -62,11 +62,11 @@ class QueryRequestRepository {
   /**
    * Get request with engine info only
    * @param {number} requestId
-   * @returns {Promise<{engine: string, query_text: string|null, script_path: string|null}|null>}
+   * @returns {Promise<{engine: string, status: string, query_text: string|null, script_path: string|null}|null>}
    */
   async findWithEngine(requestId) {
     const result = await query(
-      `SELECT di.engine, qr.query_text, qr.script_path
+      `SELECT di.engine, qr.status, qr.query_text, qr.script_path
        FROM query_requests qr
        JOIN db_instances di ON qr.db_instance_id = di.id
        WHERE qr.id = $1`,

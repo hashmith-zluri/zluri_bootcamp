@@ -41,6 +41,10 @@ const getRequestForNotification = async (requestId) => {
   return await QueryRequestRepository.findForNotification(requestId);
 };
 
+const updateRequestStatus = async (requestId, status) => {
+  return await QueryRequestRepository.updateStatus(requestId, status);
+};
+
 module.exports = {
   getApprovalRequestsByPods,
   getRequestById,
@@ -48,5 +52,6 @@ module.exports = {
   rejectRequest,
   logRejection,
   getRequestOwnership,
-  getRequestForNotification
+  getRequestForNotification,
+  updateRequestStatus
 };

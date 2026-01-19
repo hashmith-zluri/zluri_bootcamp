@@ -69,22 +69,34 @@ class ExecutionService {
   };
 
   async executeQuery(requestId) {
+    console.log(`ExecutionService: Starting execution for request ${requestId}`);
+    
     try {
       const request = await QueryRequestRepository.findWithEngine(requestId);
+      console.log(`ExecutionService: Found request ${requestId} with engine ${request?.engine}, status ${request?.status}`);
+      
       this.validateRequest(request, requestId);
       
       // Additional validation for execution type
       const hasQuery = request.query_text;
       const hasScript = request.script_path;
       
+      console.log(`ExecutionService: Request ${requestId} has query: ${!!hasQuery}, has script: ${!!hasScript}`);
+      
       if (!hasQuery && !hasScript) {
         throw new Error(`Request ${requestId} has neither query text nor script path`);
       }
       
       const executor = this.resolveExecutor(request);
-      return await executor(requestId);
+      console.log(`ExecutionService: Resolved executor for request ${requestId}, starting execution`);
+      
+      const result = await executor(requestId);
+      console.log(`ExecutionService: Execution completed for request ${requestId} with success: ${result?.success}`);
+      
+      return result;
     } catch (error) {
-      console.error(`Execution failed for request ${requestId}:`, error.message);
+      console.error(`ExecutionService: Execution failed for request ${requestId}:`, error.message);
+      console.error(`ExecutionService: Error stack:`, error.stack);
       throw error;
     }
   }

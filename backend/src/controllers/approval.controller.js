@@ -59,23 +59,45 @@ const validateRequestAccess = (request, managedPods) => {
   return { valid: true };
 };
 
-const triggerExecution = (req_id, approvedRequest) => {
+const triggerExecution = async (req_id, approvedRequest) => {
   // Only trigger execution if there's something to execute
   if (!approvedRequest.query_text && !approvedRequest.script_path) {
     console.log(`No query or script to execute for request ${req_id}`);
-    return;
+    return { success: false, error: 'No query or script to execute' };
   }
   
   const executionType = approvedRequest.query_text ? 'query' : 'script';
   console.log(`Triggering ${executionType} execution for approved request ${req_id}`);
   
-  executionService.executeQuery(req_id)
-    .then(result => /*istanbul ignore next*/{
-      console.log(`${executionType} execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
-    })
-    .catch(error => /*istanbul ignore next*/{
-      console.error(`${executionType} execution error for request ${req_id}:`, error.message);
-    });
+  try {
+    // Start execution asynchronously but ensure it's properly queued
+    const executionPromise = executionService.executeQuery(req_id);
+    
+    // Handle the promise asynchronously without blocking the response
+    executionPromise
+      .then(result => {
+        console.log(`${executionType} execution completed for request ${req_id}:`, result.success ? 'SUCCESS' : 'FAILED');
+      })
+      .catch(error => {
+        console.error(`${executionType} execution error for request ${req_id}:`, error.message);
+        // Update status to failed if execution encounters an error
+        approvalService.updateRequestStatus(req_id, 'FAILED')
+          .catch(statusError => {
+            console.error(`Failed to update status for request ${req_id}:`, statusError);
+          });
+      });
+    
+    return { success: true, message: 'Execution queued successfully' };
+  } catch (error) {
+    console.error(`Failed to queue execution for request ${req_id}:`, error);
+    // Update status to indicate execution failed to start
+    try {
+      await approvalService.updateRequestStatus(req_id, 'FAILED');
+    } catch (statusError) {
+      console.error(`Failed to update status for request ${req_id}:`, statusError);
+    }
+    return { success: false, error: error.message };
+  }
 };
 
 const sendRejectionNotification = async (req_id, reason, requestPodId) => {
@@ -194,8 +216,17 @@ const approveOrReject = async (req, res) => {
           return createErrorResponse(res, 404, "Request not found or already processed");
         }
         
-        triggerExecution(req_id, approvedRequest);
-        return createSuccessResponse(res, { status: "approved" });
+        const executionResult = await triggerExecution(req_id, approvedRequest);
+        
+        if (!executionResult.success) {
+          console.warn(`Execution failed to start for request ${req_id}: ${executionResult.error}`);
+          // Still return success for approval, but log the execution issue
+        }
+        
+        return createSuccessResponse(res, { 
+          status: "approved",
+          execution: executionResult.success ? "queued" : "failed_to_start"
+        });
       },
       
       reject: async () => {

@@ -156,7 +156,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ success: true, status: 'approved' });
+      expect(response.body).toEqual({ success: true, status: 'approved', execution: 'queued' });
       expect(executionService.executeQuery).toHaveBeenCalledWith(1);
     });
 
@@ -171,7 +171,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ success: true, status: 'approved' });
+      expect(response.body).toEqual({ success: true, status: 'approved', execution: 'queued' });
       expect(executionService.executeQuery).toHaveBeenCalledWith(1);
     });
 
@@ -239,7 +239,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ success: true, status: 'approved' });
+      expect(response.body).toEqual({ success: true, status: 'approved', execution: 'queued' });
       // The error is logged but doesn't affect the response
     });
 
@@ -254,7 +254,7 @@ describe('Approval Controller - Manager Access', () => {
         .send({ action: 'approve' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ success: true, status: 'approved' });
+      expect(response.body).toEqual({ success: true, status: 'approved', execution: 'queued' });
     });
   });
 
