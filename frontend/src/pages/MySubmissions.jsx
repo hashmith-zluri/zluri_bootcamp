@@ -6,7 +6,7 @@ import Modal from '../components/common/Modal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OutputDisplay from '../components/common/OutputDisplay';
 import CodeEditor from '../components/common/CodeEditor';
-import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
+// import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
 import { PODS } from '../utils/constants';
 
 export default function MySubmissions() {
@@ -92,15 +92,15 @@ export default function MySubmissions() {
                (req.script && req.script.toLowerCase().includes(searchLower));
       case 'comments':
         return req.comments?.toLowerCase().includes(searchLower);
-      case 'risk': {
-        const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-        const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-        return riskLabel.includes(searchLower);
-      }
+      // case 'risk': {
+      //   const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+      //   const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+      //   return riskLabel.includes(searchLower);
+      // }
       case 'all':
       default: {
-        const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-        const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+        // const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+        // const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
         return (
           req.req_id?.toString().includes(searchTerm) ||
           req.database_name?.toLowerCase().includes(searchLower) ||
@@ -108,8 +108,8 @@ export default function MySubmissions() {
           getPodName(req.pod_id)?.toLowerCase().includes(searchLower) ||
           (req.query && req.query.toLowerCase().includes(searchLower)) ||
           (req.script && req.script.toLowerCase().includes(searchLower)) ||
-          req.comments?.toLowerCase().includes(searchLower) ||
-          riskLabel.includes(searchLower)
+          req.comments?.toLowerCase().includes(searchLower)
+          // || riskLabel.includes(searchLower)
         );
       }
     }
@@ -250,7 +250,7 @@ export default function MySubmissions() {
           <option value="pod">Pod</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
-          <option value="risk">Risk Level</option>
+          {/* <option value="risk">Risk Level</option> */}
         </select>
         
         <input
@@ -291,7 +291,7 @@ export default function MySubmissions() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Database</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pod</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th>
+              {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th> */}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -299,13 +299,13 @@ export default function MySubmissions() {
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                   {loading ? 'Loading...' : 'No requests found'}
                 </td>
               </tr>
             ) : (
               paginatedRequests.map(request => {
-                const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
+                // const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
                 
                 return (
                 <tr key={request.req_id} className="hover:bg-gray-50">
@@ -326,11 +326,11 @@ export default function MySubmissions() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getPodName(request.pod_id)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {/* <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskAssessment.bgColor} ${riskAssessment.color}`}>
                       {getRiskLabel(riskAssessment.level)}
                     </span>
-                  </td>
+                  </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={request.status} />
                   </td>

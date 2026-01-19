@@ -7,7 +7,7 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OutputDisplay from '../components/common/OutputDisplay';
 import CodeEditor from '../components/common/CodeEditor';
-import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
+// import { assessQueryRisk, getRiskLabel } from '../utils/riskAssessment';
 
 export default function ApprovalDashboard() {
   const [requests, setRequests] = useState([]);
@@ -88,14 +88,14 @@ export default function ApprovalDashboard() {
       (req.query && req.query.toLowerCase().includes(searchLower)) || 
       (req.script && req.script.toLowerCase().includes(searchLower)),
     comments: (req, searchLower) => req.comments?.toLowerCase().includes(searchLower),
-    risk: (req, searchLower) => {
-      const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-      const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-      return riskLabel.includes(searchLower);
-    },
+    // risk: (req, searchLower) => {
+    //   const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+    //   const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+    //   return riskLabel.includes(searchLower);
+    // },
     all: (req, searchLower, searchTerm) => {
-      const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-      const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
+      // const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
+      // const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
       
       const searchFields = [
         req.req_id?.toString().includes(searchTerm),
@@ -105,7 +105,7 @@ export default function ApprovalDashboard() {
         req.query && req.query.toLowerCase().includes(searchLower),
         req.script && req.script.toLowerCase().includes(searchLower),
         req.comments?.toLowerCase().includes(searchLower),
-        riskLabel.includes(searchLower)
+        // riskLabel.includes(searchLower)
       ];
       
       return searchFields.some(Boolean);
@@ -305,7 +305,7 @@ export default function ApprovalDashboard() {
           <option value="database_name">Database</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
-          <option value="risk">Risk Level</option>
+          {/* <option value="risk">Risk Level</option> */}
         </select>
         
         <input
@@ -343,7 +343,7 @@ export default function ApprovalDashboard() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requester</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Database</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th>
+              {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th> */}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -351,13 +351,13 @@ export default function ApprovalDashboard() {
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                   No requests found
                 </td>
               </tr>
             ) : (
               paginatedRequests.map(request => {
-                const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
+                // const riskAssessment = assessQueryRisk(request.query, request.script, request.database_type);
                 
                 return (
                 <tr key={request.req_id} className="hover:bg-gray-50">
@@ -379,11 +379,11 @@ export default function ApprovalDashboard() {
                       {request.query ? 'Query' : 'Script'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {/* <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskAssessment.bgColor} ${riskAssessment.color}`}>
                       {getRiskLabel(riskAssessment.level)}
                     </span>
-                  </td>
+                  </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={request.status} />
                   </td>
@@ -529,7 +529,7 @@ export default function ApprovalDashboard() {
         {selectedRequest && (
           <div className="space-y-4">
             {/* Risk Assessment */}
-            {(() => {
+            {/* {(() => {
               const riskAssessment = assessQueryRisk(selectedRequest.query, selectedRequest.script, selectedRequest.database_type);
               return (
                 <div className={`p-4 rounded-lg border-2 ${riskAssessment.bgColor} ${riskAssessment.borderColor}`}>
@@ -549,7 +549,7 @@ export default function ApprovalDashboard() {
                   </div>
                 </div>
               );
-            })()}
+            })()} */}
 
             {/* Status & Info */}
             <div className="flex items-center gap-4">

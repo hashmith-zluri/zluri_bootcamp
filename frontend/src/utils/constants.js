@@ -8,7 +8,7 @@ if (isTest) {
 } else {
   try {
     // Use eval to hide import.meta from Jest parser
-    API_BASE_URL = eval('import.meta.env.VITE_API_BASE_URL') || 'https://zluribootcamp-production.up.railway.app/api/v1';
+    API_BASE_URL = eval('import.meta.env.VITE_API_BASE_URL');
   } catch (e) {
     API_BASE_URL = 'https://zluribootcamp-production.up.railway.app/api/v1';
   }
