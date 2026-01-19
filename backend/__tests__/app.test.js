@@ -2,13 +2,39 @@ const request = require('supertest');
 const app = require('../src/app');
 
 describe('App Integration Tests', () => {
+  describe('Root Redirect', () => {
+    it('should redirect root path to API docs', async () => {
+      const response = await request(app)
+        .get('/');
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe('/api-docs');
+    });
+  });
+
+  describe('Swagger Documentation', () => {
+    it('should serve Swagger UI at /api-docs', async () => {
+      const response = await request(app)
+        .get('/api-docs/');
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('swagger-ui');
+    });
+  });
+
   describe('Health Check', () => {
     it('should return health status', async () => {
       const response = await request(app)
         .get('/health');
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'ok' });
+      expect(response.body).toMatchObject({ 
+        status: 'ok',
+        version: '2.0.0',
+        documentation: '/api-docs'
+      });
+      expect(response.body.timestamp).toBeDefined();
+      expect(typeof response.body.timestamp).toBe('string');
     });
   });
 

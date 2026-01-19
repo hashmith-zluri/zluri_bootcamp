@@ -33,7 +33,6 @@ const loadOpenAPISpec = () => {
     
     return openApiSpec;
   } catch (error) {
-    console.warn("Could not load openapi.yaml, falling back to basic spec:", error.message);
     return null;
   }
 };

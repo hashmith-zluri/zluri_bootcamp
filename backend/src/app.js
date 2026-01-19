@@ -11,11 +11,7 @@ const swaggerOptions = {
     docExpansion: 'list',
     filter: true,
     showRequestDuration: true,
-    tryItOutEnabled: true,
-    requestInterceptor: (req) => {
-      // Add any request modifications here
-      return req;
-    }
+    tryItOutEnabled: true
   },
   customCss: `
     .swagger-ui .topbar { display: none }
