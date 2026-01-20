@@ -365,7 +365,7 @@ export default function MySubmissions() {
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} results
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)}
             </div>
             <div className="flex gap-2">
               <button
