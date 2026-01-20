@@ -232,6 +232,8 @@ export default function MySubmissions() {
           <option value="pod">Pod</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
+          <option value="created_at">Created Date</option>
+          <option value="approved_at">Approved Date</option>
           {/* <option value="risk">Risk Level</option> */}
         </select>
         

@@ -176,9 +176,16 @@ class QueryRequestRepository {
           qr.id::text ILIKE $${paramIndex} OR
           qr.database_name ILIKE $${paramIndex} OR
           di.name ILIKE $${paramIndex} OR
+          qr.pod_id ILIKE $${paramIndex} OR
           qr.query_text ILIKE $${paramIndex} OR
           qr.script_path ILIKE $${paramIndex} OR
-          qr.comments ILIKE $${paramIndex}
+          qr.comments ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'DD/MM/YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
         )`;
         params.push(searchTerm);
         paramIndex++;
@@ -188,6 +195,7 @@ class QueryRequestRepository {
           'req_id': 'qr.id::text',
           'database_name': 'qr.database_name',
           'instance_name': 'di.name',
+          'pod': 'qr.pod_id',
           'query': 'COALESCE(qr.query_text, qr.script_path)',
           'comments': 'qr.comments'
         };
@@ -195,6 +203,22 @@ class QueryRequestRepository {
         const dbField = fieldMap[options.searchField];
         if (dbField) {
           whereClause += ` AND ${dbField} ILIKE $${paramIndex}`;
+          params.push(searchTerm);
+          paramIndex++;
+        } else if (options.searchField === 'created_at') {
+          whereClause += ` AND (
+            TO_CHAR(qr.created_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.created_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.created_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
+          )`;
+          params.push(searchTerm);
+          paramIndex++;
+        } else if (options.searchField === 'approved_at') {
+          whereClause += ` AND (
+            TO_CHAR(qr.approved_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.approved_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.approved_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
+          )`;
           params.push(searchTerm);
           paramIndex++;
         }
@@ -258,7 +282,13 @@ class QueryRequestRepository {
           qr.database_name ILIKE $${paramIndex} OR
           qr.query_text ILIKE $${paramIndex} OR
           qr.script_path ILIKE $${paramIndex} OR
-          qr.comments ILIKE $${paramIndex}
+          qr.comments ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.created_at, 'DD/MM/YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+          TO_CHAR(qr.approved_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
         )`;
         params.push(searchTerm);
         paramIndex++;
@@ -276,6 +306,22 @@ class QueryRequestRepository {
         const dbField = fieldMap[options.searchField];
         if (dbField) {
           whereClause += ` AND ${dbField} ILIKE $${paramIndex}`;
+          params.push(searchTerm);
+          paramIndex++;
+        } else if (options.searchField === 'created_at') {
+          whereClause += ` AND (
+            TO_CHAR(qr.created_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.created_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.created_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
+          )`;
+          params.push(searchTerm);
+          paramIndex++;
+        } else if (options.searchField === 'approved_at') {
+          whereClause += ` AND (
+            TO_CHAR(qr.approved_at, 'YYYY-MM-DD') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.approved_at, 'Mon DD, YYYY') ILIKE $${paramIndex} OR
+            TO_CHAR(qr.approved_at, 'DD/MM/YYYY') ILIKE $${paramIndex}
+          )`;
           params.push(searchTerm);
           paramIndex++;
         }

@@ -275,6 +275,8 @@ export default function ApprovalDashboard() {
           <option value="database_name">Database</option>
           <option value="query">Query/Script</option>
           <option value="comments">Comments</option>
+          <option value="created_at">Created Date</option>
+          <option value="approved_at">Approved Date</option>
           {/* <option value="risk">Risk Level</option> */}
         </select>
         
