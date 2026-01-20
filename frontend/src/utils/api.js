@@ -85,7 +85,9 @@ const buildQueryParams = (params) => {
     status: (value) => value && value !== 'all' && queryParams.append('status', value),
     sortBy: (value) => value && queryParams.append('sortBy', value),
     limit: (value) => (value !== undefined && value !== null) && queryParams.append('limit', String(value)),
-    offset: (value) => (value !== undefined && value !== null) && queryParams.append('offset', String(value))
+    offset: (value) => (value !== undefined && value !== null) && queryParams.append('offset', String(value)),
+    search: (value) => value && value.trim() && queryParams.append('search', value.trim()),
+    searchField: (value) => value && queryParams.append('searchField', value)
   };
   
   Object.entries(params).forEach(([key, value]) => {
