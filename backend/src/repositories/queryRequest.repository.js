@@ -167,6 +167,40 @@ class QueryRequestRepository {
       paramIndex++;
     }
 
+    // Add search functionality for findByUserId
+    if (options.search && options.search.trim()) {
+      const searchTerm = `%${options.search.trim()}%`;
+      
+      if (options.searchField === 'all' || !options.searchField) {
+        whereClause += ` AND (
+          qr.id::text ILIKE $${paramIndex} OR
+          qr.database_name ILIKE $${paramIndex} OR
+          di.name ILIKE $${paramIndex} OR
+          qr.query_text ILIKE $${paramIndex} OR
+          qr.script_path ILIKE $${paramIndex} OR
+          qr.comments ILIKE $${paramIndex}
+        )`;
+        params.push(searchTerm);
+        paramIndex++;
+      } else {
+        // Specific field search
+        const fieldMap = {
+          'req_id': 'qr.id::text',
+          'database_name': 'qr.database_name',
+          'instance_name': 'di.name',
+          'query': 'COALESCE(qr.query_text, qr.script_path)',
+          'comments': 'qr.comments'
+        };
+        
+        const dbField = fieldMap[options.searchField];
+        if (dbField) {
+          whereClause += ` AND ${dbField} ILIKE $${paramIndex}`;
+          params.push(searchTerm);
+          paramIndex++;
+        }
+      }
+    }
+
     let sql = `
       SELECT qr.id AS reqid, qr.query_text, qr.script_path, qr.status, qr.database_name,
              qr.comments, qr.created_at, qr.approved_at, qr.pod_id,
@@ -210,6 +244,42 @@ class QueryRequestRepository {
       whereClause += ` AND qr.status = $${paramIndex}`;
       params.push(status.toUpperCase());
       paramIndex++;
+    }
+
+    // Add search functionality
+    if (options.search && options.search.trim()) {
+      const searchTerm = `%${options.search.trim()}%`;
+      
+      if (options.searchField === 'all' || !options.searchField) {
+        whereClause += ` AND (
+          qr.id::text ILIKE $${paramIndex} OR
+          u.email ILIKE $${paramIndex} OR
+          u.name ILIKE $${paramIndex} OR
+          qr.database_name ILIKE $${paramIndex} OR
+          qr.query_text ILIKE $${paramIndex} OR
+          qr.script_path ILIKE $${paramIndex} OR
+          qr.comments ILIKE $${paramIndex}
+        )`;
+        params.push(searchTerm);
+        paramIndex++;
+      } else {
+        // Specific field search
+        const fieldMap = {
+          'req_id': 'qr.id::text',
+          'requester_email': 'u.email',
+          'requester_name': 'u.name',
+          'database_name': 'qr.database_name',
+          'query': 'COALESCE(qr.query_text, qr.script_path)',
+          'comments': 'qr.comments'
+        };
+        
+        const dbField = fieldMap[options.searchField];
+        if (dbField) {
+          whereClause += ` AND ${dbField} ILIKE $${paramIndex}`;
+          params.push(searchTerm);
+          paramIndex++;
+        }
+      }
     }
 
     let sql = `

@@ -147,12 +147,14 @@ const getMyRequests = async (req, res) => {
   }
 
   try {
-    const { status, sortBy, limit, offset } = req.query;
+    const { status, sortBy, limit, offset, search, searchField } = req.query;
     const rows = await requestService.getUserRequests(userId, {
       status,
       sortBy,
       limit,
-      offset
+      offset,
+      search,
+      searchField
     });
 
     const requests = rows.map(row => ({

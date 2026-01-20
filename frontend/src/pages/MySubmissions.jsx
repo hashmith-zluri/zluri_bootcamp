@@ -14,23 +14,48 @@ export default function MySubmissions() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [stats, setStats] = useState({ all: 0, PENDING: 0, EXECUTED: 0, FAILED: 0, REJECTED: 0 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const toast = useToast();
 
-  const fetchRequests = async (statusFilter = null) => {
+  const fetchRequests = async (statusFilter = null, page = 1, pageSize = itemsPerPage, searchTerm = '', searchField = 'all') => {
     try {
       setLoading(true);
-      const params = {};
+      
+      const params = {
+        limit: pageSize,
+        offset: (page - 1) * pageSize
+      };
+      
       if (statusFilter && statusFilter !== 'all') {
         params.status = statusFilter;
       }
+      
+      // Add search parameters for server-side search
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+        params.searchField = searchField;
+      }
+      
       const data = await requestAPI.getMyRequests(params);
       setRequests(data.requests || []);
+      
+      // For server-side search, we get accurate count
+      if (data.requests) {
+        if (data.requests.length < pageSize) {
+          // If we got less than requested, we're on the last page
+          setTotalCount((page - 1) * pageSize + data.requests.length);
+        } else {
+          // Estimate there might be more pages
+          setTotalCount(page * pageSize + 1);
+        }
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -59,10 +84,14 @@ export default function MySubmissions() {
   };
 
   useEffect(() => {
-    fetchRequests(filter);
+    fetchRequests(filter, currentPage, itemsPerPage, appliedSearch, searchField);
     fetchStats();
-    setCurrentPage(1); // Reset to first page when filter changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, currentPage, itemsPerPage, appliedSearch, searchField]);
+
+  // Reset to first page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
   }, [filter]);
 
   const getPodName = (podId) => {
@@ -70,57 +99,36 @@ export default function MySubmissions() {
     return pod ? pod.name : podId || 'N/A';
   };
 
-  const filteredRequests = requests; // Already filtered by backend
+  // Handle search button click
+  const handleSearch = () => {
+    setAppliedSearch(searchTerm);
+    setCurrentPage(1);
+    // Server-side search will be triggered by useEffect
+  };
 
-  // Client-side search
-  const searchedRequests = filteredRequests.filter(req => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    
-    switch (searchField) {
-      case 'req_id':
-        return req.req_id?.toString().includes(searchTerm);
-      case 'database_name':
-        return req.database_name?.toLowerCase().includes(searchLower);
-      case 'instance_name':
-        return req.instance_name?.toLowerCase().includes(searchLower);
-      case 'pod':
-        return getPodName(req.pod_id)?.toLowerCase().includes(searchLower);
-      case 'query':
-        return (req.query && req.query.toLowerCase().includes(searchLower)) || 
-               (req.script && req.script.toLowerCase().includes(searchLower));
-      case 'comments':
-        return req.comments?.toLowerCase().includes(searchLower);
-      // case 'risk': {
-      //   const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-      //   const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-      //   return riskLabel.includes(searchLower);
-      // }
-      case 'all':
-      default: {
-        // const riskAssessment = assessQueryRisk(req.query, req.script, req.database_type);
-        // const riskLabel = getRiskLabel(riskAssessment.level).toLowerCase();
-        return (
-          req.req_id?.toString().includes(searchTerm) ||
-          req.database_name?.toLowerCase().includes(searchLower) ||
-          req.instance_name?.toLowerCase().includes(searchLower) ||
-          getPodName(req.pod_id)?.toLowerCase().includes(searchLower) ||
-          (req.query && req.query.toLowerCase().includes(searchLower)) ||
-          (req.script && req.script.toLowerCase().includes(searchLower)) ||
-          req.comments?.toLowerCase().includes(searchLower)
-          // || riskLabel.includes(searchLower)
-        );
-      }
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setAppliedSearch('');
+    setCurrentPage(1);
+    // Server-side search will be triggered by useEffect
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
-  });
+  };
 
-  // Pagination
-  const totalPages = Math.ceil(searchedRequests.length / itemsPerPage);
-  const paginatedRequests = searchedRequests.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const filteredRequests = requests; // Server-side filtering
+
+  // No client-side search needed - all handled by server
+  const searchedRequests = filteredRequests;
+
+  // Server-side pagination - use server results directly
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const paginatedRequests = searchedRequests;
 
   const handleViewResult = (request) => {
     setSelectedRequest(request);
@@ -148,31 +156,14 @@ export default function MySubmissions() {
 
   const formatDate = (dateString) => {
     if (!dateString) {
-      // Use current time if no date provided
-      return new Date().toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
-      });
+      return 'N/A';
     }
     
     try {
       const date = new Date(dateString);
-      // Check if date is valid, if not use current time
+      // Check if date is valid
       if (isNaN(date.getTime())) {
-        return new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          timeZoneName: 'short'
-        });
+        return 'Invalid Date';
       }
       
       return date.toLocaleString('en-US', {
@@ -181,20 +172,11 @@ export default function MySubmissions() {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
+        second: '2-digit'
       });
     } catch (error) {
-      // Use current time for any errors
-      return new Date().toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
-      });
+      console.warn('Date formatting error:', error);
+      return 'Invalid Date';
     }
   };
 
@@ -253,16 +235,30 @@ export default function MySubmissions() {
           {/* <option value="risk">Risk Level</option> */}
         </select>
         
-        <input
-          type="text"
-          placeholder={`Search by ${searchField === 'all' ? 'any field' : searchField.replace('_', ' ')}...`}
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="flex-1 min-w-50 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+        <div className="flex-1 flex gap-2">
+          <input
+            type="text"
+            placeholder={`Search by ${searchField === 'all' ? 'any field' : searchField.replace('_', ' ')}...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleSearchKeyPress}
+            className="flex-1 min-w-50 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <button
+            onClick={handleSearch}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Search
+          </button>
+          {appliedSearch && (
+            <button
+              onClick={handleClearSearch}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">Per page:</label>
@@ -291,6 +287,7 @@ export default function MySubmissions() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Database</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pod</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
               {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk</th> */}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -299,7 +296,7 @@ export default function MySubmissions() {
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   {loading ? 'Loading...' : 'No requests found'}
                 </td>
               </tr>
@@ -325,6 +322,9 @@ export default function MySubmissions() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getPodName(request.pod_id)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{formatDate(request.created_at)}</div>
                   </td>
                   {/* <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskAssessment.bgColor} ${riskAssessment.color}`}>
@@ -363,7 +363,7 @@ export default function MySubmissions() {
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, searchedRequests.length)} of {searchedRequests.length}
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} results
             </div>
             <div className="flex gap-2">
               <button
@@ -504,6 +504,9 @@ export default function MySubmissions() {
             {/* Timestamps - moved to bottom */}
             <div className="text-xs text-gray-500 pt-4 border-t space-y-1">
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-medium">Created:</span> {formatDate(selectedRequest.created_at)}
+                </div>
                 {selectedRequest.approved_at && (
                   <div>
                     <span className="font-medium">Approved:</span> {formatDate(selectedRequest.approved_at)}
