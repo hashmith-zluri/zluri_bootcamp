@@ -3,85 +3,85 @@ import userEvent from '@testing-library/user-event';
 import Tooltip from '../../../src/components/common/Tooltip';
 
 describe('Tooltip', () => {
+  const defaultProps = {
+    content: 'This is a tooltip',
+    children: <button>Hover me</button>,
+  };
+
   it('should render children', () => {
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
+    render(<Tooltip {...defaultProps} />);
     
     expect(screen.getByText('Hover me')).toBeInTheDocument();
   });
 
-  it('should not show tooltip initially', () => {
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
-    
-    expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
-  });
-
-  it('should show tooltip on mouse enter', async () => {
+  it('should show tooltip on hover', async () => {
     const user = userEvent.setup();
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
+    render(<Tooltip {...defaultProps} />);
     
-    const button = screen.getByText('Hover me');
-    await user.hover(button);
+    const trigger = screen.getByText('Hover me');
+    await user.hover(trigger);
     
-    expect(screen.getByText('Tooltip text')).toBeInTheDocument();
+    expect(screen.getByText('This is a tooltip')).toBeInTheDocument();
   });
 
-  it('should hide tooltip on mouse leave', async () => {
+  it('should hide tooltip on unhover', async () => {
     const user = userEvent.setup();
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
+    render(<Tooltip {...defaultProps} />);
     
-    const button = screen.getByText('Hover me');
-    await user.hover(button);
-    expect(screen.getByText('Tooltip text')).toBeInTheDocument();
+    const trigger = screen.getByText('Hover me');
+    await user.hover(trigger);
+    expect(screen.getByText('This is a tooltip')).toBeInTheDocument();
     
-    await user.unhover(button);
-    expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
+    await user.unhover(trigger);
+    expect(screen.queryByText('This is a tooltip')).not.toBeInTheDocument();
   });
 
-  it('should apply custom className to container', () => {
-    const { container } = render(
-      <Tooltip content="Tooltip text" className="custom-class">
-        <button>Hover me</button>
-      </Tooltip>
-    );
-    
-    expect(container.firstChild).toHaveClass('custom-class');
-  });
-
-
-  it('should have correct base classes on container', () => {
-    const { container } = render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
-    
-    expect(container.firstChild).toHaveClass('relative', 'inline-block');
-  });
-
-  it('should render tooltip with correct styling', async () => {
+  it('should show tooltip on focus', async () => {
     const user = userEvent.setup();
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    );
+    render(<Tooltip {...defaultProps} />);
     
+    const trigger = screen.getByText('Hover me');
+    await user.click(trigger);
+    
+    expect(screen.getByText('This is a tooltip')).toBeInTheDocument();
+  });
+
+  it('should hide tooltip on blur', async () => {
+    const user = userEvent.setup();
+    render(<Tooltip {...defaultProps} />);
+    
+    const trigger = screen.getByText('Hover me');
+    await user.click(trigger);
+    expect(screen.getByText('This is a tooltip')).toBeInTheDocument();
+    
+    await user.tab();
+    expect(screen.queryByText('This is a tooltip')).not.toBeInTheDocument();
+  });
+
+  it('should render with top position by default', async () => {
+    const user = userEvent.setup();
+    render(<Tooltip {...defaultProps} />);
+    
+    const trigger = screen.getByText('Hover me');
+    await user.hover(trigger);
+    
+    const tooltip = screen.getByText('This is a tooltip');
+    expect(tooltip).toHaveClass('bottom-full', 'mb-2');
+  });
+
+  it('should render with bottom position', async () => {
+    const user = userEvent.setup();
+    render(<Tooltip {...defaultProps} position="bottom" />);
+    
+    const trigger = screen.getByText('Hover me');
+    await user.hover(trigger);
+    
+    const tooltip = screen.getByText('This is a tooltip');
+    expect(tooltip).toHaveClass('top-full', 'mt-2');
+  });
+
+  it('should render with left position', async () => {
+    c
     const button = screen.getByText('Hover me');
     await user.hover(button);
     

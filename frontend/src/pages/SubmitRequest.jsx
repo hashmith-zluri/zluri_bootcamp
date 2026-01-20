@@ -304,7 +304,7 @@ export default function SubmitRequest() {
     }
   };
 
-  // Client-side validation function for single queries
+  // Client-side validation function for single queries (SQL or MongoDB)
   const validateSingleQuery = (query) => {
     if (!query || typeof query !== 'string') {
       return { isValid: true }; // Let other validations handle this
@@ -317,8 +317,8 @@ export default function SubmitRequest() {
     
     // Remove comments and normalize whitespace
     let cleanQuery = trimmedQuery
-      // Remove single-line comments (-- comment)
-      .replace(/--.*$/gm, '')
+      // Remove single-line comments (-- comment for SQL, // comment for MongoDB)
+      .replace(/(?:--|\/\/).*$/gm, '')
       // Remove multi-line comments (/* comment */)
       .replace(/\/\*[\s\S]*?\*\//g, '')
       // Normalize whitespace
@@ -343,23 +343,36 @@ export default function SubmitRequest() {
     if (statements.length > 1) {
       return {
         isValid: false,
-        error: 'Multiple SQL statements are not allowed. Please submit only one query at a time for security reasons.'
+        error: dbType === 'MONGO' 
+          ? 'Multiple MongoDB operations are not allowed. Please submit only one operation at a time for security reasons.'
+          : 'Multiple SQL statements are not allowed. Please submit only one query at a time for security reasons.'
       };
     }
     
-    // Additional security checks - look for patterns in the original query
-    const suspiciousPatterns = [
+    // Additional security checks for SQL patterns
+    const suspiciousSqlPatterns = [
       { pattern: /;\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)/i, message: 'Multiple SQL statements detected' },
       { pattern: /UNION\s+(?:ALL\s+)?SELECT/i, message: 'UNION queries with multiple SELECT statements are not allowed' },
       { pattern: /;\s*--/, message: 'Semicolon followed by comments is suspicious' },
       { pattern: /;\s*\/\*/, message: 'Semicolon followed by block comments is suspicious' }
     ];
     
-    for (const { pattern, message } of suspiciousPatterns) {
+    // Additional security checks for MongoDB patterns
+    const suspiciousMongoPatterns = [
+      { pattern: /;\s*db\./i, message: 'Multiple MongoDB operations detected' },
+      { pattern: /db\.[^;]+;\s*db\./i, message: 'Multiple MongoDB operations in sequence detected' },
+      { pattern: /db\.\w+\.[^)]+\)\s+db\./i, message: 'Multiple MongoDB operations without semicolon detected' }
+    ];
+    
+    const patternsToCheck = dbType === 'MONGO' ? suspiciousMongoPatterns : suspiciousSqlPatterns;
+    
+    for (const { pattern, message } of patternsToCheck) {
       if (pattern.test(query)) {
         return {
           isValid: false,
-          error: `${message}. Please submit only single SQL statements.`
+          error: dbType === 'MONGO' 
+            ? `${message}. Please submit only single MongoDB operations.`
+            : `${message}. Please submit only single SQL statements.`
         };
       }
     }
@@ -570,7 +583,7 @@ await yourFunction();`}
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
-                        Multiple queries detected
+                        Multiple operations detected
                       </span>
                     ) : null;
                   })()}
@@ -614,7 +627,11 @@ await yourFunction();`}
                   </svg>
                   <div className="text-sm text-blue-700">
                     <p className="font-medium">Security Notice:</p>
-                    <p>Only single SQL statements are allowed. Multiple queries separated by semicolons are blocked for security reasons.</p>
+                    {dbType === 'MONGO' ? (
+                      <p>Only single MongoDB operations are allowed. Multiple operations separated by semicolons are blocked for security reasons.</p>
+                    ) : (
+                      <p>Only single SQL statements are allowed. Multiple queries separated by semicolons are blocked for security reasons.</p>
+                    )}
                   </div>
                 </div>
               </div>

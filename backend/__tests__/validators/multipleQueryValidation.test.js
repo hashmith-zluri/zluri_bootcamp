@@ -72,7 +72,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject query with semicolon followed by another statement', () => {
@@ -86,7 +86,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject UNION injection attempts', () => {
@@ -100,7 +100,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject query with semicolon and comment injection', () => {
@@ -114,7 +114,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject query with semicolon and block comment injection', () => {
@@ -128,7 +128,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject multiple statements with different operations', () => {
@@ -142,7 +142,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
 
     it('should reject complex injection with multiple techniques', () => {
@@ -156,7 +156,7 @@ describe('Multiple Query Validation', () => {
 
       const result = submitRequestSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
   });
 
@@ -264,8 +264,92 @@ describe('Multiple Query Validation', () => {
 
         const result = submitRequestSchema.safeParse(invalidData);
         expect(result.success).toBe(false);
-        expect(result.error.issues[0].message).toContain('Only single SQL statements are allowed');
+        expect(result.error.issues[0].message).toContain('Only single statements are allowed');
       });
+    });
+  });
+
+  describe('MongoDB Multiple Operations Validation', () => {
+    it('should reject multiple MongoDB operations separated by semicolon', () => {
+      const invalidData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find(); db.products.find()',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
+    });
+
+    it('should reject multiple MongoDB operations with different spacing', () => {
+      const invalidData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find();\ndb.products.insertOne({name: "test"})',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
+    });
+
+    it('should accept single MongoDB operation', () => {
+      const validData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find({status: "active"})',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept MongoDB operation with semicolon in string', () => {
+      const validData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find({description: "This; has; semicolons"})',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject MongoDB operations with suspicious patterns', () => {
+      const invalidData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find(); db.users.drop()',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
+    });
+
+    it('should reject multiple MongoDB operations without semicolon', () => {
+      const invalidData = {
+        instance_id: 1,
+        db_name: 'test',
+        query: 'db.users.find() db.products.find()',
+        comments: 'Test comment',
+        pod_id: 'pod-1'
+      };
+      
+      const result = submitRequestSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
+      expect(result.error.issues[0].message).toContain('Only single statements are allowed');
     });
   });
 });

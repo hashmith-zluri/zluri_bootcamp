@@ -1,5 +1,11 @@
 npm test -- --coverage && open coverage/index.html
 
+https://zluribootcamp-production.up.railway.app/api/v1
+
+https://zluri-bootcamp.vercel.app/login
+
+https://github.com/hashmith-zluri/zluri_bootcamp
+
 1. script example given in the reference implementation and mine are different as shown below 
 
 my implementation:::

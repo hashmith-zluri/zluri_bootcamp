@@ -64,6 +64,7 @@ const renderApprovalDashboard = () => {
 describe('ApprovalDashboard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Set default mock for all tests
     approvalAPI.getPendingRequests.mockResolvedValue({ requests: mockRequests });
   });
 
@@ -1187,8 +1188,10 @@ describe('ApprovalDashboard', () => {
       });
     });
     
-    // Clear search
-    await user.clear(searchInput);
+    // Clear search by triple clicking to select all and then deleting
+    await user.tripleClick(searchInput);
+    await user.keyboard('{Delete}');
+    
     const clearButton = screen.queryByRole('button', { name: 'Clear' });
     if (clearButton) {
       await user.click(clearButton);
@@ -1675,6 +1678,22 @@ describe('ApprovalDashboard', () => {
   it('should handle search by req_id with no match', async () => {
     const user = userEvent.setup();
     
+    // Reset and set up custom mock
+    approvalAPI.getPendingRequests.mockReset();
+    
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
+    
     renderApprovalDashboard();
     
     await waitFor(() => {
@@ -1687,6 +1706,10 @@ describe('ApprovalDashboard', () => {
     const searchInput = screen.getByPlaceholderText(/Search by/);
     await user.type(searchInput, '999999');
     
+    // Click search button to trigger server-side search
+    const searchButton = screen.getByRole('button', { name: 'Search' });
+    await user.click(searchButton);
+    
     await waitFor(() => {
       expect(screen.getByText('No requests found')).toBeInTheDocument();
     });
@@ -1694,6 +1717,22 @@ describe('ApprovalDashboard', () => {
 
   it('should handle search by requester_email with no match', async () => {
     const user = userEvent.setup();
+    
+    // Reset and set up custom mock
+    approvalAPI.getPendingRequests.mockReset();
+    
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -1707,6 +1746,10 @@ describe('ApprovalDashboard', () => {
     const searchInput = screen.getByPlaceholderText(/Search by/);
     await user.type(searchInput, 'nonexistent@email.com');
     
+    // Click search button to trigger server-side search
+    const searchButton = screen.getByRole('button', { name: 'Search' });
+    await user.click(searchButton);
+    
     await waitFor(() => {
       expect(screen.getByText('No requests found')).toBeInTheDocument();
     });
@@ -1714,6 +1757,22 @@ describe('ApprovalDashboard', () => {
 
   it('should handle search by requester_name with no match', async () => {
     const user = userEvent.setup();
+    
+    // Reset and set up custom mock
+    approvalAPI.getPendingRequests.mockReset();
+    
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -1727,6 +1786,10 @@ describe('ApprovalDashboard', () => {
     const searchInput = screen.getByPlaceholderText(/Search by/);
     await user.type(searchInput, 'NonexistentName');
     
+    // Click search button to trigger server-side search
+    const searchButton = screen.getByRole('button', { name: 'Search' });
+    await user.click(searchButton);
+    
     await waitFor(() => {
       expect(screen.getByText('No requests found')).toBeInTheDocument();
     });
@@ -1734,6 +1797,19 @@ describe('ApprovalDashboard', () => {
 
   it('should handle search by database_name with no match', async () => {
     const user = userEvent.setup();
+    
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -1746,6 +1822,10 @@ describe('ApprovalDashboard', () => {
     
     const searchInput = screen.getByPlaceholderText(/Search by/);
     await user.type(searchInput, 'nonexistentdb');
+    
+    // Click search button to trigger server-side search
+    const searchButton = screen.getByRole('button', { name: 'Search' });
+    await user.click(searchButton);
     
     await waitFor(() => {
       expect(screen.getByText('No requests found')).toBeInTheDocument();
@@ -1784,11 +1864,18 @@ describe('ApprovalDashboard', () => {
   it('should handle search by comments with no match', async () => {
     const user = userEvent.setup();
     
-    // Mock empty results for search
-    approvalAPI.getPendingRequests
-      .mockResolvedValueOnce({ requests: mockRequests }) // Initial load
-      .mockResolvedValueOnce({ requests: mockRequests }) // Stats call
-      .mockResolvedValueOnce({ requests: [] }); // Search result
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -1873,11 +1960,18 @@ describe('ApprovalDashboard', () => {
   it('should handle search by query with no query or script', async () => {
     const user = userEvent.setup();
     
-    // Mock empty results for search
-    approvalAPI.getPendingRequests
-      .mockResolvedValueOnce({ requests: mockRequests }) // Initial load
-      .mockResolvedValueOnce({ requests: mockRequests }) // Stats call
-      .mockResolvedValueOnce({ requests: [] }); // Search result
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -1913,11 +2007,18 @@ describe('ApprovalDashboard', () => {
   it('should handle search all fields with no query or script', async () => {
     const user = userEvent.setup();
     
-    // Mock empty results for search
-    approvalAPI.getPendingRequests
-      .mockResolvedValueOnce({ requests: mockRequests }) // Initial load
-      .mockResolvedValueOnce({ requests: mockRequests }) // Stats call
-      .mockResolvedValueOnce({ requests: [] }); // Search result
+    // Set up mock to return data initially, then empty results for search
+    let callCount = 0;
+    approvalAPI.getPendingRequests.mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) {
+        // First two calls (initial load and stats) return data
+        return Promise.resolve({ requests: mockRequests });
+      } else {
+        // Search call returns empty
+        return Promise.resolve({ requests: [] });
+      }
+    });
     
     renderApprovalDashboard();
     
@@ -2003,7 +2104,8 @@ describe('ApprovalDashboard', () => {
   it('should close reject modal using onClose callback', async () => {
     const user = userEvent.setup();
     
-    // Ensure we have the right mock setup
+    // Reset and set up custom mock
+    approvalAPI.getPendingRequests.mockReset();
     approvalAPI.getPendingRequests.mockResolvedValue({ requests: mockRequests });
     
     renderApprovalDashboard();
@@ -2033,9 +2135,6 @@ describe('ApprovalDashboard', () => {
 
   it('should close result modal using onClose callback', async () => {
     const user = userEvent.setup();
-    
-    // Ensure we have the right mock setup
-    approvalAPI.getPendingRequests.mockResolvedValue({ requests: mockRequests });
     
     renderApprovalDashboard();
     

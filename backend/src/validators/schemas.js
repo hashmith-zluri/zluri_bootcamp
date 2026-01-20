@@ -1,6 +1,6 @@
 const { z } = require('zod');
 
-// Helper function to validate single SQL query
+// Helper function to validate single query (SQL or MongoDB)
 const validateSingleQuery = (query) => {
   if (!query || typeof query !== 'string') return true; // Let other validations handle this
   
@@ -9,8 +9,8 @@ const validateSingleQuery = (query) => {
   
   // Remove comments and normalize whitespace
   let cleanQuery = trimmedQuery
-    // Remove single-line comments (-- comment)
-    .replace(/--.*$/gm, '')
+    // Remove single-line comments (-- comment for SQL, // comment for MongoDB)
+    .replace(/(?:--|\/\/).*$/gm, '')
     // Remove multi-line comments (/* comment */)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     // Normalize whitespace
@@ -36,16 +36,25 @@ const validateSingleQuery = (query) => {
     return false;
   }
   
-  // Additional security checks - look for patterns in the original query
-  const suspiciousPatterns = [
+  // Additional security checks for SQL patterns
+  const suspiciousSqlPatterns = [
     /;\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)/i,
     /UNION\s+(?:ALL\s+)?SELECT/i,
     /;\s*--/,
     /;\s*\/\*/
   ];
   
-  const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(query));
-  if (hasSuspiciousPattern) {
+  // Additional security checks for MongoDB patterns
+  const suspiciousMongoPatterns = [
+    /;\s*db\./i,  // Multiple db operations separated by semicolon
+    /db\.[^;]+;\s*db\./i,  // Multiple db operations in sequence with semicolon
+    /db\.\w+\.[^)]+\)\s+db\./i,  // Multiple db operations without semicolon (space separated)
+  ];
+  
+  const hasSuspiciousSqlPattern = suspiciousSqlPatterns.some(pattern => pattern.test(query));
+  const hasSuspiciousMongoPattern = suspiciousMongoPatterns.some(pattern => pattern.test(query));
+  
+  if (hasSuspiciousSqlPattern || hasSuspiciousMongoPattern) {
     return false;
   }
   
@@ -65,7 +74,7 @@ const submitRequestSchema = z.object({
   query: z.string()
     .optional()
     .refine(validateSingleQuery, {
-      message: 'Only single SQL statements are allowed. Multiple queries separated by semicolons are not permitted for security reasons.'
+      message: 'Only single statements are allowed. Multiple queries/operations separated by semicolons are not permitted for security reasons.'
     }),
   comments: z.string()
     .min(1, 'comments is required')
