@@ -85,9 +85,6 @@ class SlackService {
               `*Status:*\n⏳ Pending Approval`
             ),
           Blocks.Section({ text: `*${requestType} Preview:*\n\`\`\`${queryPreview}\`\`\`` }),
-          Blocks.Context().elements(
-            `Submitted at ${new Date().toLocaleString()}`
-          )
         )
         .buildToObject();
 
@@ -206,9 +203,6 @@ class SlackService {
           Blocks.Section({
             text: `*🔗 Full Preview URL:*\n${this.frontendUrl}/my-submissions`
           }),
-          Blocks.Context().elements(
-            `✓ Executed successfully at ${new Date().toLocaleString()}`
-          )
         )
         .buildToObject();
 
@@ -270,9 +264,6 @@ class SlackService {
           Blocks.Section({
             text: `*🔗 Full Preview URL:*\n${this.frontendUrl}/my-submissions`
           }),
-          Blocks.Context().elements(
-            `Failed at ${new Date().toLocaleString()}`
-          )
         )
         .buildToObject();
 
@@ -334,9 +325,6 @@ class SlackService {
           Blocks.Section({ 
             text: `*Rejection Reason:*\n${rejectionReason}` 
           }),
-          Blocks.Context().elements(
-            `Rejected at ${new Date().toLocaleString()}`
-          )
         )
         .buildToObject();
 

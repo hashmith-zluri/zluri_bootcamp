@@ -515,7 +515,7 @@ export default function MySubmissions() {
                   </div>
                 )}
               </div>
-              {selectedRequest.result?.executed_at && (
+              {selectedRequest.result?.executed_at && selectedRequest.status !== 'REJECTED' && (
                 <div>
                   <span className="font-medium">Executed:</span> {formatDate(selectedRequest.result.executed_at)}
                 </div>

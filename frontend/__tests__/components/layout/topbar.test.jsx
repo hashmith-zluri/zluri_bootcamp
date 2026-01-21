@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import Topbar from '../../../src/components/layout/topbar';
+import { ToastProvider } from '../../../src/context/ToastContext';
 
 // Mock useNavigate
 const mockNavigate = jest.fn();
@@ -10,10 +11,25 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-const renderWithRouter = (component) => {
+// Mock toast functions
+const mockToast = {
+  success: jest.fn(),
+  error: jest.fn(),
+  info: jest.fn(),
+  warning: jest.fn(),
+};
+
+jest.mock('../../../src/context/ToastContext', () => ({
+  ...jest.requireActual('../../../src/context/ToastContext'),
+  useToast: () => mockToast,
+}));
+
+const renderWithProviders = (component) => {
   return render(
     <BrowserRouter>
-      {component}
+      <ToastProvider>
+        {component}
+      </ToastProvider>
     </BrowserRouter>
   );
 };
@@ -40,7 +56,7 @@ describe('Topbar', () => {
   });
 
   it('should render title', () => {
-    renderWithRouter(<Topbar />);
+    renderWithProviders(<Topbar />);
     expect(screen.getByText('Database Query Management Portal')).toBeInTheDocument();
   });
 
@@ -48,7 +64,7 @@ describe('Topbar', () => {
     const mockUser = { id: 1, name: 'John Doe', email: 'john@example.com', role: 'DEVELOPER' };
     localStorageMock.getItem.mockReturnValue(JSON.stringify(mockUser));
 
-    renderWithRouter(<Topbar />);
+    renderWithProviders(<Topbar />);
     
     expect(screen.getByText('john@example.com')).toBeInTheDocument();
     expect(screen.getByText('DEVELOPER')).toBeInTheDocument();
@@ -59,7 +75,7 @@ describe('Topbar', () => {
     const mockUser = { id: 1, name: 'John Doe', email: 'john@example.com', role: 'DEVELOPER' };
     localStorageMock.getItem.mockReturnValue(JSON.stringify(mockUser));
 
-    renderWithRouter(<Topbar />);
+    renderWithProviders(<Topbar />);
     
     expect(screen.getByText('Logout')).toBeInTheDocument();
   });
@@ -67,7 +83,7 @@ describe('Topbar', () => {
   it('should not render user info when no user', () => {
     localStorageMock.getItem.mockReturnValue(null);
 
-    renderWithRouter(<Topbar />);
+    renderWithProviders(<Topbar />);
     
     expect(screen.queryByText('Logout')).not.toBeInTheDocument();
   });
@@ -77,12 +93,13 @@ describe('Topbar', () => {
     const mockUser = { id: 1, name: 'John Doe', email: 'john@example.com', role: 'DEVELOPER' };
     localStorageMock.getItem.mockReturnValue(JSON.stringify(mockUser));
 
-    renderWithRouter(<Topbar />);
+    renderWithProviders(<Topbar />);
     
     await user.click(screen.getByText('Logout'));
     
     expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
     expect(localStorageMock.removeItem).toHaveBeenCalledWith('token');
+    expect(mockToast.success).toHaveBeenCalledWith('Logout successful!');
     expect(mockNavigate).toHaveBeenCalledWith('/login');
   });
 });

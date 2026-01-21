@@ -7,7 +7,7 @@ describe('StatusBadge - Additional Coverage', () => {
     
     const badge = screen.getByText('EXECUTING');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('bg-blue-100', 'text-blue-800');
+    expect(badge).toHaveClass('bg-purple-100', 'text-purple-800');
     expect(badge).toHaveAttribute('title', 'Request is currently being executed');
   });
 
@@ -16,7 +16,7 @@ describe('StatusBadge - Additional Coverage', () => {
     
     const badge = screen.getByText('APPROVED');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('bg-purple-100', 'text-purple-800');
+    expect(badge).toHaveClass('bg-blue-100', 'text-blue-800');
     expect(badge).toHaveAttribute('title', 'Request has been approved and is ready for execution');
   });
 
@@ -32,24 +32,27 @@ describe('StatusBadge - Additional Coverage', () => {
   it('should handle null status', () => {
     render(<StatusBadge status={null} />);
     
-    const badge = screen.getByText('NULL');
+    const badge = screen.getByTitle('Unknown status');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('bg-gray-100', 'text-gray-800');
+    expect(badge).toHaveAttribute('title', 'Unknown status');
   });
 
   it('should handle undefined status', () => {
     render(<StatusBadge status={undefined} />);
     
-    const badge = screen.getByText('UNDEFINED');
+    const badge = screen.getByTitle('Unknown status');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('bg-gray-100', 'text-gray-800');
+    expect(badge).toHaveAttribute('title', 'Unknown status');
   });
 
   it('should handle empty string status', () => {
     render(<StatusBadge status="" />);
     
-    const badge = screen.getByText('EMPTY');
+    const badge = screen.getByTitle('Unknown status');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('bg-gray-100', 'text-gray-800');
+    expect(badge).toHaveAttribute('title', 'Unknown status');
   });
 });

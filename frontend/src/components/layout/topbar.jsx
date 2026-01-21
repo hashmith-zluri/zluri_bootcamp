@@ -1,12 +1,15 @@
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../../context/ToastContext";
 
 export default function Topbar() {
   const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
+  const toast = useToast();
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    toast.success('Logout successful!');
     navigate("/login");
   };
 

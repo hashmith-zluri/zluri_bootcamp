@@ -79,6 +79,8 @@ export const dbAPI = {
 
 // Helper function to build query parameters
 const buildQueryParams = (params) => {
+  if (!params) return '';
+  
   const queryParams = new URLSearchParams();
   
   const paramHandlers = {

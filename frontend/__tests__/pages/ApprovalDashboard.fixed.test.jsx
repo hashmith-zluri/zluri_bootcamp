@@ -367,13 +367,10 @@ describe('ApprovalDashboard - Fixed Tests', () => {
       const clearButton = screen.getByRole('button', { name: 'Clear' });
       await user.click(clearButton);
       
-      // Search input should be cleared
+      // Search input should be cleared and clear button should disappear
       await waitFor(() => {
-        expect(searchInput.value).toBe('');
-      });
-      
-      // Clear button should disappear
-      await waitFor(() => {
+        const updatedSearchInput = screen.getByPlaceholderText(/Search by/);
+        expect(updatedSearchInput).toHaveValue('');
         expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
       });
     });

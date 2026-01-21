@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import DashboardLayout from '../../../src/components/layout/dashboardlayout';
+import { ToastProvider } from '../../../src/context/ToastContext';
 
 // Mock localStorage
 const localStorageMock = {
@@ -18,14 +19,29 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
+// Mock toast functions
+const mockToast = {
+  success: jest.fn(),
+  error: jest.fn(),
+  info: jest.fn(),
+  warning: jest.fn(),
+};
+
+jest.mock('../../../src/context/ToastContext', () => ({
+  ...jest.requireActual('../../../src/context/ToastContext'),
+  useToast: () => mockToast,
+}));
+
 const renderWithRouter = () => {
   return render(
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<div>Dashboard Content</div>} />
-        </Route>
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route path="/" element={<DashboardLayout />}>
+            <Route index element={<div>Dashboard Content</div>} />
+          </Route>
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   );
 };
