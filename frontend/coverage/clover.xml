@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1768978059352" clover="3.2.0">
-  <project timestamp="1768978059352" name="All files">
-    <metrics statements="1036" coveredstatements="994" conditionals="847" coveredconditionals="765" methods="260" coveredmethods="254" elements="2143" coveredelements="2013" complexity="0" loc="1036" ncloc="1036" packages="8" files="26" classes="26"/>
+<coverage generated="1769002959960" clover="3.2.0">
+  <project timestamp="1769002959960" name="All files">
+    <metrics statements="1038" coveredstatements="996" conditionals="849" coveredconditionals="767" methods="260" coveredmethods="254" elements="2147" coveredelements="2017" complexity="0" loc="1038" ncloc="1038" packages="8" files="26" classes="26"/>
     <package name="src">
       <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
       <file name="App.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/App.jsx">
@@ -147,7 +147,7 @@
       </file>
     </package>
     <package name="src.components.layout">
-      <metrics statements="16" coveredstatements="16" conditionals="17" coveredconditionals="16" methods="7" coveredmethods="7"/>
+      <metrics statements="18" coveredstatements="18" conditionals="17" coveredconditionals="16" methods="7" coveredmethods="7"/>
       <file name="dashboardlayout.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/components/layout/dashboardlayout.jsx">
         <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
         <line num="6" count="10" type="stmt"/>
@@ -164,35 +164,37 @@
         <line num="74" count="7" type="stmt"/>
       </file>
       <file name="topbar.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/components/layout/topbar.jsx">
-        <metrics statements="7" coveredstatements="7" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="2"/>
-        <line num="4" count="18" type="stmt"/>
+        <metrics statements="9" coveredstatements="9" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="2"/>
         <line num="5" count="18" type="stmt"/>
+        <line num="6" count="18" type="stmt"/>
         <line num="7" count="18" type="stmt"/>
-        <line num="8" count="1" type="stmt"/>
-        <line num="9" count="1" type="stmt"/>
+        <line num="9" count="18" type="stmt"/>
         <line num="10" count="1" type="stmt"/>
-        <line num="13" count="18" type="stmt"/>
+        <line num="11" count="1" type="stmt"/>
+        <line num="12" count="1" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="16" count="18" type="stmt"/>
       </file>
     </package>
     <package name="src.context">
       <metrics statements="34" coveredstatements="34" conditionals="13" coveredconditionals="12" methods="19" coveredmethods="19"/>
       <file name="ToastContext.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/context/ToastContext.jsx">
         <metrics statements="34" coveredstatements="34" conditionals="13" coveredconditionals="12" methods="19" coveredmethods="19"/>
-        <line num="3" count="11" type="stmt"/>
-        <line num="6" count="391" type="stmt"/>
-        <line num="8" count="391" type="cond" truecount="0" falsecount="1"/>
+        <line num="3" count="13" type="stmt"/>
+        <line num="6" count="400" type="stmt"/>
+        <line num="8" count="400" type="cond" truecount="0" falsecount="1"/>
         <line num="9" count="102" type="stmt"/>
         <line num="10" count="102" type="stmt"/>
         <line num="13" count="102" type="stmt"/>
-        <line num="14" count="13" type="stmt"/>
-        <line num="18" count="391" type="stmt"/>
+        <line num="14" count="12" type="stmt"/>
+        <line num="18" count="400" type="stmt"/>
         <line num="19" count="1" type="stmt"/>
-        <line num="22" count="391" type="stmt"/>
-        <line num="23" count="391" type="stmt"/>
-        <line num="24" count="391" type="stmt"/>
-        <line num="25" count="391" type="stmt"/>
-        <line num="27" count="391" type="stmt"/>
-        <line num="36" count="391" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="400" type="stmt"/>
+        <line num="23" count="400" type="stmt"/>
+        <line num="24" count="400" type="stmt"/>
+        <line num="25" count="400" type="stmt"/>
+        <line num="27" count="400" type="stmt"/>
+        <line num="36" count="400" type="cond" truecount="2" falsecount="0"/>
         <line num="38" count="98" type="stmt"/>
         <line num="39" count="106" type="cond" truecount="4" falsecount="0"/>
         <line num="41" count="46" type="stmt"/>
@@ -208,10 +210,10 @@
         <line num="64" count="98" type="stmt"/>
         <line num="67" count="106" type="stmt"/>
         <line num="74" count="1" type="stmt"/>
-        <line num="86" count="1964" type="stmt"/>
-        <line num="87" count="1963" type="cond" truecount="2" falsecount="0"/>
+        <line num="86" count="1973" type="stmt"/>
+        <line num="87" count="1972" type="cond" truecount="2" falsecount="0"/>
         <line num="88" count="2" type="stmt"/>
-        <line num="90" count="1961" type="stmt"/>
+        <line num="90" count="1970" type="stmt"/>
       </file>
     </package>
     <package name="src.hooks">
@@ -266,9 +268,9 @@
       </file>
     </package>
     <package name="src.pages">
-      <metrics statements="466" coveredstatements="442" conditionals="404" coveredconditionals="348" methods="109" coveredmethods="105"/>
+      <metrics statements="466" coveredstatements="442" conditionals="406" coveredconditionals="350" methods="109" coveredmethods="105"/>
       <file name="ApprovalDashboard.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/pages/ApprovalDashboard.jsx">
-        <metrics statements="143" coveredstatements="134" conditionals="107" coveredconditionals="95" methods="37" coveredmethods="35"/>
+        <metrics statements="143" coveredstatements="134" conditionals="108" coveredconditionals="96" methods="37" coveredmethods="35"/>
         <line num="13" count="738" type="stmt"/>
         <line num="14" count="738" type="stmt"/>
         <line num="15" count="738" type="stmt"/>
@@ -310,8 +312,8 @@
         <line num="76" count="166" type="stmt"/>
         <line num="77" count="163" type="cond" truecount="2" falsecount="0"/>
         <line num="81" count="163" type="cond" truecount="4" falsecount="0"/>
-        <line num="82" count="139" type="stmt"/>
-        <line num="85" count="24" type="stmt"/>
+        <line num="82" count="138" type="stmt"/>
+        <line num="85" count="25" type="stmt"/>
         <line num="88" count="2" type="stmt"/>
         <line num="90" count="165" type="stmt"/>
         <line num="95" count="738" type="stmt"/>
@@ -319,9 +321,9 @@
         <line num="97" count="166" type="stmt"/>
         <line num="98" count="162" type="cond" truecount="2" falsecount="0"/>
         <line num="101" count="162" type="stmt"/>
-        <line num="102" count="884" type="stmt"/>
-        <line num="103" count="884" type="cond" truecount="2" falsecount="0"/>
-        <line num="104" count="884" type="stmt"/>
+        <line num="102" count="897" type="stmt"/>
+        <line num="103" count="897" type="cond" truecount="2" falsecount="0"/>
+        <line num="104" count="897" type="stmt"/>
         <line num="107" count="162" type="stmt"/>
         <line num="110" count="3" type="stmt"/>
         <line num="114" count="738" type="stmt"/>
@@ -433,7 +435,7 @@
         <line num="41" count="54" type="stmt"/>
       </file>
       <file name="MySubmissions.jsx" path="/Users/hashmith/zluri_bootcamp/frontend/src/pages/MySubmissions.jsx">
-        <metrics statements="105" coveredstatements="96" conditionals="96" coveredconditionals="82" methods="30" coveredmethods="28"/>
+        <metrics statements="105" coveredstatements="96" conditionals="97" coveredconditionals="83" methods="30" coveredmethods="28"/>
         <line num="13" count="306" type="stmt"/>
         <line num="14" count="306" type="stmt"/>
         <line num="15" count="306" type="stmt"/>
